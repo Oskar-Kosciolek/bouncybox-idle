@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass
@@ -27,12 +27,29 @@ class GameState:
     upgrade_auto_collector: int = 0   # max 1
     upgrade_coins_on_bounce: int = 0  # max 3
 
+    # Prestige
+    prestige_count: int = 0
+    prestige_crystals: int = 0
+    prestige_crystals_total: int = 0
+
+    # Prestige upgrades (permanentne, nie resetują się)
+    prestige_speed: int = 0        # max 5, +10% base_speed za poziom
+    prestige_hole_size: int = 0    # max 5, +8° hole_size za poziom
+    prestige_coin_mult: int = 0    # max 5, +25% monet za poziom
+    prestige_extra_ball: int = 0   # max 2, dodatkowa piłka od startu
+
+    # Osiągnięcia — set odblokowanych id
+    achievements_unlocked: set = field(default_factory=set)
+    achievement_coins_earned: float = 0.0  # osobny licznik do osiągnięć (bez mnożników)
+
     def add_coins(self, amount: float) -> None:
-        """Dodaje monety z uwzględnieniem mnożnika."""
-        multiplier = 1.0 + self.upgrade_coin_multiplier * 0.5
-        earned = amount * multiplier
+        """Dodaje monety z uwzględnieniem mnożnika upgradeów i prestige."""
+        upgrade_mult = 1.0 + self.upgrade_coin_multiplier * 0.5
+        prestige_mult = 1.0 + self.prestige_coin_mult * 0.25
+        earned = amount * upgrade_mult * prestige_mult
         self.coins += earned
         self.total_coins_earned += earned
+        self.achievement_coins_earned += amount  # bez mnożników, do osiągnięć
 
     def spend_coins(self, amount: float) -> bool:
         """Wydaje monety. Zwraca True jeśli transakcja się powiodła."""
@@ -40,6 +57,55 @@ class GameState:
             self.coins -= amount
             return True
         return False
+
+    def spend_crystals(self, amount: int) -> bool:
+        """Wydaje kryształy prestige. Zwraca True jeśli transakcja się powiodła."""
+        if self.prestige_crystals >= amount:
+            self.prestige_crystals -= amount
+            return True
+        return False
+
+    def prestige(self) -> bool:
+        """Wykonuje prestige. Wymaga fali >= 10. Zwraca True jeśli się powiodło."""
+        if self.wave < 10:
+            return False
+
+        # Oblicz liczbę kryształów do zdobycia
+        crystals = 1 + self.prestige_count // 2
+
+        # Zachowaj permanentne pola przed resetem
+        saved_prestige_count = self.prestige_count
+        saved_prestige_crystals = self.prestige_crystals
+        saved_prestige_crystals_total = self.prestige_crystals_total
+        saved_prestige_speed = self.prestige_speed
+        saved_prestige_hole_size = self.prestige_hole_size
+        saved_prestige_coin_mult = self.prestige_coin_mult
+        saved_prestige_extra_ball = self.prestige_extra_ball
+        saved_achievements_unlocked = self.achievements_unlocked
+        saved_achievement_coins_earned = self.achievement_coins_earned
+
+        # Zresetuj wszystkie pola do wartości domyślnych
+        defaults = GameState()
+        for attr, val in defaults.__dict__.items():
+            setattr(self, attr, val)
+
+        # Przywróć permanentne pola
+        self.prestige_count = saved_prestige_count
+        self.prestige_crystals = saved_prestige_crystals
+        self.prestige_crystals_total = saved_prestige_crystals_total
+        self.prestige_speed = saved_prestige_speed
+        self.prestige_hole_size = saved_prestige_hole_size
+        self.prestige_coin_mult = saved_prestige_coin_mult
+        self.prestige_extra_ball = saved_prestige_extra_ball
+        self.achievements_unlocked = saved_achievements_unlocked
+        self.achievement_coins_earned = saved_achievement_coins_earned
+
+        # Dodaj kryształy i zwiększ licznik prestige
+        self.prestige_crystals += crystals
+        self.prestige_crystals_total += crystals
+        self.prestige_count += 1
+
+        return True
 
     def on_ring_destroyed(self) -> float:
         """Wywołaj gdy okrąg zostanie zniszczony. Zwraca ile monet przyznano."""

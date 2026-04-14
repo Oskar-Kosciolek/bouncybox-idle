@@ -1,3 +1,5 @@
+import math
+import random
 import pygame
 from config import Config
 
@@ -13,6 +15,10 @@ class Ball:
         self.color = (230, 80, 80)
         self.collision_cooldown = 0.0  # czas blokady po ostatnim odbiciu
         self._trail: list[tuple[float, float]] = []  # historia pozycji do smugi
+        # Stała prędkość bazowa — utrzymywana po każdym odbiciu
+        self.base_speed: float = math.sqrt(
+            config.initial_speed_x ** 2 + config.initial_speed_y ** 2
+        )
 
     def update(self, dt: float) -> None:
         # Grawitacja
@@ -32,6 +38,14 @@ class Ball:
         dot = self.vx * nx + self.vy * ny
         self.vx = (self.vx - 2 * dot * nx) * self.config.restitution
         self.vy = (self.vy - 2 * dot * ny) * self.config.restitution
+
+        # Losowe odchylenie ±12° — zapobiega zapętlonym torom
+        angle = math.atan2(self.vy, self.vx)
+        angle += math.radians(random.uniform(-12, 12))
+        # Normalizacja do stałej prędkości bazowej
+        self.vx = math.cos(angle) * self.base_speed
+        self.vy = math.sin(angle) * self.base_speed
+
         self.collision_cooldown = 0.05
 
     def reset(self, x: float, y: float) -> None:

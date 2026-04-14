@@ -6,9 +6,11 @@ class TabBar:
     """Pasek zakładek po prawej stronie okna."""
 
     TABS: list[tuple[str, str]] = [
-        ("\U0001f3ae", "Gra"),
-        ("\u26a1", "Sklep"),
-        ("\U0001f333", "Drzewko"),
+        ("[G]", "Gra"),
+        ("[S]", "Sklep"),
+        ("[D]", "Drzewko"),
+        ("[P]", "Prestige"),
+        ("[A]", "Osiag."),
     ]
 
     def __init__(self, x: int, y: int, width: int, height: int) -> None:

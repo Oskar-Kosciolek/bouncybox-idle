@@ -5,11 +5,15 @@ from circle_ring import CircleRing
 from particles import ParticleSystem
 from config import Config
 from game_state import GameState
-from upgrade_tree import UPGRADES
+from upgrade_tree import UPGRADES, PRESTIGE_UPGRADES
+from achievements import ACHIEVEMENTS, check_achievements
 from ui.tab_bar import TabBar
 from ui.shop_view import ShopView
 from ui.tree_view import TreeView
 from ui.game_view import GameView
+from ui.prestige_view import PrestigeView
+from ui.achievements_view import AchievementsView
+from ui.notification import NotificationSystem
 
 WINDOW_W: int = 700
 WINDOW_H: int = 520
@@ -51,6 +55,27 @@ def _sync_balls(balls: list[Ball], cx: float, cy: float,
     return balls
 
 
+def _notify_achievements(newly_unlocked: list,
+                          notifications: NotificationSystem) -> None:
+    """Dodaje powiadomienia dla nowo odblokowanych osiągnięć."""
+    for ach in newly_unlocked:
+        if ach.reward_coins > 0:
+            notifications.add(
+                f"Osiagniecie: {ach.name}! +{ach.reward_coins:.0f} monet",
+                color=(255, 220, 80),
+            )
+        else:
+            notifications.add(
+                f"Osiagniecie: {ach.name}!",
+                color=(255, 220, 80),
+            )
+        if ach.reward_crystals > 0:
+            notifications.add(
+                f"+{ach.reward_crystals} krysztalow",
+                color=(150, 220, 255),
+            )
+
+
 def main() -> None:
     pygame.init()
     screen = pygame.display.set_mode((WINDOW_W, WINDOW_H))
@@ -77,6 +102,28 @@ def main() -> None:
     shop_view = ShopView(PANEL_AREA, state, UPGRADES)
     tree_view = TreeView(PANEL_AREA, state, UPGRADES)
     game_view = GameView(GAME_AREA)
+    prestige_view = PrestigeView(PANEL_AREA, state, PRESTIGE_UPGRADES)
+    achievements_view = AchievementsView(PANEL_AREA, state, ACHIEVEMENTS)
+    notifications = NotificationSystem()
+
+    def do_prestige() -> None:
+        """Callback wywoływany po kliknięciu przycisku PRESTIGE."""
+        nonlocal rings, balls, particles, spawn_timer, game_won
+        if state.prestige():
+            config.apply_upgrades(state)
+            rings = [CircleRing(config, (GAME_W, GAME_H))]
+            # Piłka startowa + dodatkowe z ulepszenia prestige_extra_ball
+            balls = [Ball(cx, cy, config)]
+            for i in range(state.prestige_extra_ball):
+                balls.append(Ball(cx + 20 * (i + 1), cy, config))
+            particles = ParticleSystem()
+            spawn_timer = 0.0
+            game_won = False
+            notifications.add("PRESTIGE! Nowa runda rozpoczeta.",
+                              color=(255, 150, 50), lifetime=4.0)
+            # Sprawdź osiągnięcia prestige
+            newly_unlocked = check_achievements(state)
+            _notify_achievements(newly_unlocked, notifications)
 
     running = True
     while running:
@@ -93,7 +140,17 @@ def main() -> None:
                 if event.key == pygame.K_ESCAPE:
                     running = False
                 if event.key == pygame.K_r:
-                    # Restart gry
+                    # Nowa runda — zachowuje monety, ulepszenia i falę
+                    config.apply_upgrades(state)
+                    rings = [CircleRing(config, (GAME_W, GAME_H))]
+                    balls = _make_balls(cx, cy, config,
+                                       state.upgrade_multi_ball + 1)
+                    particles = ParticleSystem()
+                    spawn_timer = 0.0
+                    game_won = False
+                if event.key == pygame.K_F5:
+                    # Pełny reset — wszystko od zera
+                    print("Pelny reset!")
                     state = GameState()
                     config.apply_upgrades(state)
                     rings = [CircleRing(config, (GAME_W, GAME_H))]
@@ -101,6 +158,8 @@ def main() -> None:
                     particles = ParticleSystem()
                     shop_view.state = state
                     tree_view.state = state
+                    prestige_view.state = state
+                    achievements_view.state = state
                     spawn_timer = 0.0
                     game_won = False
 
@@ -117,6 +176,15 @@ def main() -> None:
                         b.radius = config.ball_radius
                     # Dospawnuj piłki jeśli multi_ball wzrósł
                     balls = _sync_balls(balls, cx, cy, config, state)
+                    # Sprawdź osiągnięcia po zakupie
+                    newly_unlocked = check_achievements(state)
+                    _notify_achievements(newly_unlocked, notifications)
+
+            elif tab_bar.active == 3:
+                prestige_view.handle_event(event, do_prestige)
+
+            elif tab_bar.active == 4:
+                achievements_view.handle_event(event)
 
         # ----------------------------------------------------------------
         # Logika gry (zawsze w tle, niezależnie od aktywnej zakładki)
@@ -167,6 +235,9 @@ def main() -> None:
                                 config.apply_upgrades(state)
                                 for b in balls:
                                     b.radius = config.ball_radius
+                            # Sprawdź osiągnięcia po zniszczeniu okręgu i awansie fali
+                            newly_unlocked = check_achievements(state)
+                            _notify_achievements(newly_unlocked, notifications)
                         if collided:
                             state.on_bounce()
                             break
@@ -194,6 +265,10 @@ def main() -> None:
         # HUD gry
         game_view.draw_hud(screen, font, state)
 
+        # Powiadomienia (nad obszarem gry)
+        notifications.update(dt)
+        notifications.draw(screen, font)
+
         # Separator między grą a panelem
         pygame.draw.line(screen, (40, 40, 55), (GAME_W, 0), (GAME_W, WINDOW_H), 2)
 
@@ -210,6 +285,12 @@ def main() -> None:
         elif tab_bar.active == 2:
             tree_view.rect = content_rect
             tree_view.draw(screen, font)
+        elif tab_bar.active == 3:
+            prestige_view.rect = content_rect
+            prestige_view.draw(screen, font)
+        elif tab_bar.active == 4:
+            achievements_view.rect = content_rect
+            achievements_view.draw(screen, font)
         # Zakładka 0 (Gra) — tylko HUD, nic dodatkowego w panelu
 
         # Ekran wygranej

@@ -1,5 +1,8 @@
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from game_state import GameState
 
 
 @dataclass
@@ -44,6 +47,44 @@ class Upgrade:
         attr = f"upgrade_{self.id}"
         setattr(state, attr, getattr(state, attr) + 1)
         return True
+
+
+@dataclass
+class PrestigeUpgrade:
+    id: str
+    name: str
+    description: str
+    max_level: int
+    cost_crystals: int   # stały koszt w kryształach za poziom
+
+    def current_level(self, state: "GameState") -> int:
+        """Zwraca aktualny poziom ulepszenia prestige."""
+        return getattr(state, f"prestige_{self.id}")
+
+    def is_maxed(self, state: "GameState") -> bool:
+        """Sprawdza czy osiągnięto maksymalny poziom."""
+        return self.current_level(state) >= self.max_level
+
+    def can_afford(self, state: "GameState") -> bool:
+        """Sprawdza czy gracz ma wystarczająco kryształów."""
+        return state.prestige_crystals >= self.cost_crystals
+
+    def purchase(self, state: "GameState") -> bool:
+        """Kupuje jeden poziom. Zwraca True jeśli zakup się powiódł."""
+        if self.is_maxed(state) or not self.can_afford(state):
+            return False
+        state.spend_crystals(self.cost_crystals)
+        attr = f"prestige_{self.id}"
+        setattr(state, attr, getattr(state, attr) + 1)
+        return True
+
+
+PRESTIGE_UPGRADES: list[PrestigeUpgrade] = [
+    PrestigeUpgrade("speed",      "Wrodzona prędkość", "+10% bazowej prędkości na start", 5, 2),
+    PrestigeUpgrade("hole_size",  "Wyczucie dziury",   "+8° rozmiaru dziury na start",    5, 2),
+    PrestigeUpgrade("coin_mult",  "Złota rączka",      "+25% monet permanentnie",         5, 3),
+    PrestigeUpgrade("extra_ball", "Druga szansa",      "Dodatkowa piłka od startu",       2, 5),
+]
 
 
 UPGRADES: list[Upgrade] = [

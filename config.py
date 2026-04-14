@@ -33,13 +33,17 @@ class Config:
     ball_trail_enabled: bool = False   # czy rysować smugę za piłką
 
     def apply_upgrades(self, state) -> None:
-        """Aktualizuje pola config na podstawie aktualnych poziomów ulepszeń."""
-        base_speed = 200.0
+        """Aktualizuje pola config na podstawie aktualnych poziomów ulepszeń i prestige."""
+        # Prestige bonusy (permanentne)
+        prestige_speed_bonus = 1.0 + state.prestige_speed * 0.10
+        prestige_hole_bonus = state.prestige_hole_size * 8.0
+
+        base_speed = 200.0 * prestige_speed_bonus
         speed = base_speed * (1.0 + state.upgrade_ball_speed * 0.2)
         self.initial_speed_x = speed
         self.initial_speed_y = -speed
         self.ball_radius = 8 + state.upgrade_ball_size * 2
-        self.hole_size = 45.0 + state.upgrade_hole_size * 10.0
+        self.hole_size = 45.0 + state.upgrade_hole_size * 10.0 + prestige_hole_bonus
         self.hole_count = 1 + state.upgrade_hole_count
         self.hole_moving = state.upgrade_hole_speed > 0
         self.hole_move_speed = state.upgrade_hole_speed * 25.0
