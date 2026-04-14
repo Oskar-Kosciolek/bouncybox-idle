@@ -1,0 +1,55 @@
+import pygame
+from config import Config
+
+
+class Ball:
+    def __init__(self, x: float, y: float, config: Config) -> None:
+        self.config = config
+        self.x = x
+        self.y = y
+        self.vx = config.initial_speed_x
+        self.vy = config.initial_speed_y
+        self.radius = config.ball_radius
+        self.color = (230, 80, 80)
+        self.collision_cooldown = 0.0  # czas blokady po ostatnim odbiciu
+        self._trail: list[tuple[float, float]] = []  # historia pozycji do smugi
+
+    def update(self, dt: float) -> None:
+        # Grawitacja
+        if self.config.gravity_enabled:
+            self.vy += self.config.gravity_strength * dt
+
+        self.collision_cooldown = max(0.0, self.collision_cooldown - dt)
+        # Zapisz pozycję do smugi (max 20 punktów)
+        self._trail.append((self.x, self.y))
+        if len(self._trail) > 20:
+            self._trail.pop(0)
+        self.x += self.vx * dt
+        self.y += self.vy * dt
+
+    def bounce_radial(self, nx: float, ny: float) -> None:
+        """Odbicie od normalnej (nx, ny) — wektor jednostkowy od środka okręgu do piłki."""
+        dot = self.vx * nx + self.vy * ny
+        self.vx = (self.vx - 2 * dot * nx) * self.config.restitution
+        self.vy = (self.vy - 2 * dot * ny) * self.config.restitution
+        self.collision_cooldown = 0.05
+
+    def reset(self, x: float, y: float) -> None:
+        self.x = x
+        self.y = y
+        self.vx = self.config.initial_speed_x
+        self.vy = self.config.initial_speed_y
+        self.collision_cooldown = 0.0
+        self._trail.clear()
+
+    def draw(self, surface: pygame.Surface) -> None:
+        # Smuga (jeśli włączona)
+        if self.config.ball_trail_enabled and len(self._trail) > 1:
+            for i, (tx, ty) in enumerate(self._trail):
+                alpha = i / len(self._trail)
+                r = int(self.color[0] * alpha)
+                g = int(self.color[1] * alpha)
+                b = int(self.color[2] * alpha)
+                trail_r = max(1, int(self.radius * alpha * 0.6))
+                pygame.draw.circle(surface, (r, g, b), (int(tx), int(ty)), trail_r)
+        pygame.draw.circle(surface, self.color, (int(self.x), int(self.y)), self.radius)
