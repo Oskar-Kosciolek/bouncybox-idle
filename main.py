@@ -1,3 +1,4 @@
+import random
 import pygame
 
 from ball import Ball
@@ -16,6 +17,7 @@ from ui.achievements_view import AchievementsView
 from ui.notification import NotificationSystem
 from powerup import PowerUpSystem
 from ui.settings_view import SettingsView
+from ui.floating_text import FloatingTextSystem
 
 from constants import GAME_W, GAME_H, WINDOW_W, WINDOW_H, PANEL_W, FPS, BG_COLOR
 
@@ -90,7 +92,7 @@ def main() -> None:
     particles = ParticleSystem()
     rings: list[CircleRing] = [CircleRing(config, (GAME_W, GAME_H), hp=state.get_ring_hp())]
     balls: list[Ball] = _make_balls(cx, cy, config, 1)
-    spawn_timer: float = 0.0
+    floating_texts = FloatingTextSystem()
     game_won: bool = False
 
     tab_bar = TabBar(GAME_W, 0, PANEL_W, WINDOW_H)
@@ -105,7 +107,7 @@ def main() -> None:
 
     def do_prestige() -> None:
         """Callback wywoływany po kliknięciu przycisku PRESTIGE."""
-        nonlocal rings, balls, particles, spawn_timer, game_won
+        nonlocal rings, balls, particles, game_won, floating_texts
         if state.prestige():
             config.apply_upgrades(state)
             rings = [CircleRing(config, (GAME_W, GAME_H), hp=state.get_ring_hp())]
@@ -114,7 +116,7 @@ def main() -> None:
             for i in range(state.prestige_extra_ball):
                 balls.append(Ball(cx + 20 * (i + 1), cy, config))
             particles = ParticleSystem()
-            spawn_timer = 0.0
+            floating_texts = FloatingTextSystem()
             game_won = False
             notifications.add("PRESTIGE! Nowa runda rozpoczeta.",
                               color=(255, 150, 50), lifetime=4.0)
@@ -124,7 +126,7 @@ def main() -> None:
 
     def _apply_powerup_to_game(kind: str) -> None:
         """Stosuje natychmiastowy efekt power-upa na grę."""
-        nonlocal rings, balls, spawn_timer
+        nonlocal rings, balls
 
         if kind == "gold":
             # Oznacz aktywny okrąg jako złoty — x7 monet przy zniszczeniu
@@ -172,7 +174,7 @@ def main() -> None:
                     balls = _make_balls(cx, cy, config,
                                        state.upgrade_multi_ball + 1)
                     particles = ParticleSystem()
-                    spawn_timer = 0.0
+                    floating_texts = FloatingTextSystem()
                     game_won = False
                     powerup_system = PowerUpSystem()
                 if event.key == pygame.K_F5:
@@ -183,11 +185,11 @@ def main() -> None:
                     rings = [CircleRing(config, (GAME_W, GAME_H), hp=state.get_ring_hp())]
                     balls = _make_balls(cx, cy, config, 1)
                     particles = ParticleSystem()
+                    floating_texts = FloatingTextSystem()
                     shop_view.state = state
                     tree_view.state = state
                     prestige_view.state = state
                     achievements_view.state = state
-                    spawn_timer = 0.0
                     game_won = False
                     powerup_system = PowerUpSystem()
 
@@ -235,11 +237,10 @@ def main() -> None:
                     game_won = True
                     break
 
-            # Spawn nowych okręgów
-            spawn_timer += dt
-            if spawn_timer >= config.ring_spawn_interval:
-                rings.append(CircleRing(config, (GAME_W, GAME_H), hp=state.get_ring_hp()))
-                spawn_timer = 0.0
+            # Spawn nowego okręgu gdy lista jest pusta
+            if not rings:
+                hp = state.get_ring_hp()
+                rings.append(CircleRing(config, (GAME_W, GAME_H), hp=hp))
 
             # Aktualizuj okręgi — ice spowalnia zmniejszanie
             ice_mult = 0.05 if powerup_system.ice_active else 1.0
@@ -281,10 +282,25 @@ def main() -> None:
                                 config.apply_upgrades(state)
                                 for b in balls:
                                     b.radius = config.ball_radius
+                            # Floating text — zdobyte monety w miejscu okręgu
+                            floating_texts.add(
+                                ring.cx, ring.cy,
+                                f"+{coins:.0f}",
+                                color=(255, 220, 50),
+                                lifetime=1.2,
+                            )
                             # Sprawdź osiągnięcia po zniszczeniu okręgu i awansie fali
                             newly_unlocked = check_achievements(state)
                             _notify_achievements(newly_unlocked, notifications)
                         if collided:
+                            # Floating text — obrażenia w miejscu uderzenia
+                            floating_texts.add(
+                                ball.x + random.randint(-10, 10),
+                                ball.y + random.randint(-15, -5),
+                                f"-{config.ball_damage}",
+                                color=(255, 180, 80),
+                                lifetime=0.7,
+                            )
                             state.on_bounce()
                             break
 
@@ -312,7 +328,11 @@ def main() -> None:
             ring.draw(screen)
         particles.draw(screen)
         for ball in balls:
-            ball.draw(screen)
+            ball.draw(screen, dt)
+
+        # Pływające napisy (obrażenia, monety)
+        floating_texts.update(dt)
+        floating_texts.draw(screen, font)
 
         # Power-upy na planszy + HUD aktywnych efektów
         powerup_system.draw(screen, font)

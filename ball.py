@@ -12,7 +12,9 @@ class Ball:
         self.vx = config.initial_speed_x
         self.vy = config.initial_speed_y
         self.radius = config.ball_radius
-        self.color = (230, 80, 80)
+        self.base_color = (230, 80, 80)
+        self.color = self.base_color
+        self.hit_flash: float = 0.0   # timer błysku koloru po odbiciu
         self.collision_cooldown = 0.0  # czas blokady po ostatnim odbiciu
         self._trail: list[tuple[float, float]] = []  # historia pozycji do smugi
         # Stała prędkość bazowa — utrzymywana po każdym odbiciu
@@ -47,6 +49,7 @@ class Ball:
         self.vy = math.sin(angle) * self.base_speed
 
         self.collision_cooldown = 0.01
+        self.hit_flash = 0.15  # 150ms błysku
 
     def reset(self, x: float, y: float) -> None:
         self.x = x
@@ -56,14 +59,18 @@ class Ball:
         self.collision_cooldown = 0.0
         self._trail.clear()
 
-    def draw(self, surface: pygame.Surface) -> None:
+    def draw(self, surface: pygame.Surface, dt: float = 0.0) -> None:
+        # Zaktualizuj błysk koloru
+        self.hit_flash = max(0.0, self.hit_flash - dt)
+        color = (255, 255, 255) if self.hit_flash > 0 else self.base_color
+
         # Smuga (jeśli włączona)
         if self.config.ball_trail_enabled and len(self._trail) > 1:
             for i, (tx, ty) in enumerate(self._trail):
                 alpha = i / len(self._trail)
-                r = int(self.color[0] * alpha)
-                g = int(self.color[1] * alpha)
-                b = int(self.color[2] * alpha)
+                r = int(color[0] * alpha)
+                g = int(color[1] * alpha)
+                b = int(color[2] * alpha)
                 trail_r = max(1, int(self.radius * alpha * 0.6))
                 pygame.draw.circle(surface, (r, g, b), (int(tx), int(ty)), trail_r)
-        pygame.draw.circle(surface, self.color, (int(self.x), int(self.y)), self.radius)
+        pygame.draw.circle(surface, color, (int(self.x), int(self.y)), self.radius)
