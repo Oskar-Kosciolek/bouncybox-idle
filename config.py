@@ -25,7 +25,7 @@ class Config:
 
     # Dziury
     hole_count: int = 1                # liczba dziur na okręgu (1-4)
-    hole_size: float = 45.0            # rozmiar dziury w stopniach
+    hole_size: float = 22.0            # rozmiar dziury w stopniach (małe — złoty strzał)
     hole_moving: bool = False          # czy dziura się porusza
     hole_move_speed: float = 60.0      # deg/s — prędkość ruchu dziury
 

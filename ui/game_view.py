@@ -41,8 +41,9 @@ class GameView:
         coins_surf = font.render(coins_str, True, _COL_COIN)
         surface.blit(coins_surf, (hud_rect.x + pad, mid_y - coins_surf.get_height() // 2))
 
-        # Fala (prawa strona)
-        wave_str = f"Fala {state.wave}"
+        # Fala + HP okręgów (prawa strona)
+        ring_hp = state.get_ring_hp()
+        wave_str = f"Fala {state.wave}  |  HP okręgów: {ring_hp}"
         wave_surf = font.render(wave_str, True, _COL_WAVE)
         wave_x = hud_rect.right - wave_surf.get_width() - pad
         surface.blit(wave_surf, (wave_x, mid_y - wave_surf.get_height() // 2))

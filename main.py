@@ -93,7 +93,7 @@ def main() -> None:
     cy = GAME_H // 2
 
     particles = ParticleSystem()
-    rings: list[CircleRing] = [CircleRing(config, (GAME_W, GAME_H))]
+    rings: list[CircleRing] = [CircleRing(config, (GAME_W, GAME_H), hp=state.get_ring_hp())]
     balls: list[Ball] = _make_balls(cx, cy, config, 1)
     spawn_timer: float = 0.0
     game_won: bool = False
@@ -111,7 +111,7 @@ def main() -> None:
         nonlocal rings, balls, particles, spawn_timer, game_won
         if state.prestige():
             config.apply_upgrades(state)
-            rings = [CircleRing(config, (GAME_W, GAME_H))]
+            rings = [CircleRing(config, (GAME_W, GAME_H), hp=state.get_ring_hp())]
             # Piłka startowa + dodatkowe z ulepszenia prestige_extra_ball
             balls = [Ball(cx, cy, config)]
             for i in range(state.prestige_extra_ball):
@@ -142,7 +142,7 @@ def main() -> None:
                 if event.key == pygame.K_r:
                     # Nowa runda — zachowuje monety, ulepszenia i falę
                     config.apply_upgrades(state)
-                    rings = [CircleRing(config, (GAME_W, GAME_H))]
+                    rings = [CircleRing(config, (GAME_W, GAME_H), hp=state.get_ring_hp())]
                     balls = _make_balls(cx, cy, config,
                                        state.upgrade_multi_ball + 1)
                     particles = ParticleSystem()
@@ -153,7 +153,7 @@ def main() -> None:
                     print("Pelny reset!")
                     state = GameState()
                     config.apply_upgrades(state)
-                    rings = [CircleRing(config, (GAME_W, GAME_H))]
+                    rings = [CircleRing(config, (GAME_W, GAME_H), hp=state.get_ring_hp())]
                     balls = _make_balls(cx, cy, config, 1)
                     particles = ParticleSystem()
                     shop_view.state = state
@@ -204,7 +204,7 @@ def main() -> None:
             # Spawn nowych okręgów
             spawn_timer += dt
             if spawn_timer >= config.ring_spawn_interval:
-                rings.append(CircleRing(config, (GAME_W, GAME_H)))
+                rings.append(CircleRing(config, (GAME_W, GAME_H), hp=state.get_ring_hp()))
                 spawn_timer = 0.0
 
             # Aktualizuj okręgi
@@ -226,10 +226,20 @@ def main() -> None:
                         was_alive = ring.alive
                         collided = ring.check_collision(ball)
                         if was_alive and not ring.alive:
-                            # Okrąg zniszczony
-                            state.on_ring_destroyed()
+                            # Okrąg zniszczony — ustal przyczynę
+                            coins = state.on_ring_destroyed()
                             particles.explode_ring(ring.cx, ring.cy,
                                                    ring.radius, ring.color)
+                            if not collided:
+                                # Piłka trafiła w dziurę
+                                notifications.add(
+                                    f"Dziura! +{coins:.0f} monet",
+                                    color=(255, 220, 50))
+                            else:
+                                # Okrąg starty przez odbicia
+                                notifications.add(
+                                    f"Zniszczony! +{coins:.0f} monet",
+                                    color=(100, 200, 255))
                             wave_up = state.check_wave_progress()
                             if wave_up:
                                 config.apply_upgrades(state)

@@ -122,6 +122,10 @@ class GameState:
         if self.upgrade_coins_on_bounce > 0:
             self.add_coins(self.upgrade_coins_on_bounce * 0.5)
 
+    def get_ring_hp(self) -> int:
+        """Startowe HP okręgu = 100, rośnie o 15 za każdą falę."""
+        return 100 + (self.wave - 1) * 15
+
     def check_wave_progress(self) -> bool:
         """Zwraca True jeśli awansowano na nową falę."""
         if self.rings_destroyed_this_wave >= self.rings_to_next_wave:
