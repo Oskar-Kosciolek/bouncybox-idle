@@ -107,13 +107,13 @@ class GameState:
 
         return True
 
-    def on_ring_destroyed(self) -> float:
+    def on_ring_destroyed(self, gold_multiplier: float = 1.0) -> float:
         """Wywołaj gdy okrąg zostanie zniszczony. Zwraca ile monet przyznano."""
         self.rings_destroyed += 1
         self.rings_destroyed_this_wave += 1
         base_coins = 10.0 + self.wave * 5.0
         explosion_bonus = 1.0 + self.upgrade_explosion * 0.3
-        coins = base_coins * explosion_bonus
+        coins = base_coins * explosion_bonus * gold_multiplier
         self.add_coins(coins)
         return coins
 
