@@ -14,6 +14,8 @@ from ui.game_view import GameView
 from ui.prestige_view import PrestigeView
 from ui.achievements_view import AchievementsView
 from ui.notification import NotificationSystem
+from powerup import PowerUpSystem
+from ui.settings_view import SettingsView
 
 from constants import GAME_W, GAME_H, WINDOW_W, WINDOW_H, PANEL_W, FPS, BG_COLOR
 
@@ -98,6 +100,8 @@ def main() -> None:
     prestige_view = PrestigeView(PANEL_AREA, state, PRESTIGE_UPGRADES)
     achievements_view = AchievementsView(PANEL_AREA, state, ACHIEVEMENTS)
     notifications = NotificationSystem()
+    powerup_system = PowerUpSystem()
+    settings_view = SettingsView(PANEL_AREA)
 
     def do_prestige() -> None:
         """Callback wywoływany po kliknięciu przycisku PRESTIGE."""
@@ -117,6 +121,35 @@ def main() -> None:
             # Sprawdź osiągnięcia prestige
             newly_unlocked = check_achievements(state)
             _notify_achievements(newly_unlocked, notifications)
+
+    def _apply_powerup_to_game(kind: str) -> None:
+        """Stosuje natychmiastowy efekt power-upa na grę."""
+        nonlocal rings, balls, spawn_timer
+
+        if kind == "gold":
+            # Oznacz aktywny okrąg jako złoty — x7 monet przy zniszczeniu
+            alive = [r for r in rings if r.alive]
+            if alive:
+                alive[-1].gold_multiplier = 7.0
+                notifications.add("ZLOTY x7! Zniszcz aktywny okrag!", (255, 200, 40))
+
+        elif kind == "bomb":
+            # Zniszcz drugi okrąg od końca (obok aktywnego)
+            alive = [r for r in rings if r.alive]
+            if len(alive) >= 2:
+                target = alive[-2]
+                target.destroy()
+                gold_mult = getattr(target, "gold_multiplier", 1.0)
+                coins = state.on_ring_destroyed(gold_multiplier=gold_mult)
+                particles.explode_ring(target.cx, target.cy,
+                                       target.radius, target.color)
+                notifications.add(f"BOMBA! +{coins:.0f} monet", (220, 80, 60))
+            else:
+                notifications.add("Bomba - brak celu!", (220, 80, 60))
+
+        elif kind == "ice":
+            # Efekt spowolnienia obsługiwany przez powerup_system.ice_active
+            notifications.add("ICE! Okregi spowolnione!", (80, 180, 255))
 
     running = True
     while running:
@@ -141,6 +174,7 @@ def main() -> None:
                     particles = ParticleSystem()
                     spawn_timer = 0.0
                     game_won = False
+                    powerup_system = PowerUpSystem()
                 if event.key == pygame.K_F5:
                     # Pełny reset — wszystko od zera
                     print("Pelny reset!")
@@ -155,6 +189,7 @@ def main() -> None:
                     achievements_view.state = state
                     spawn_timer = 0.0
                     game_won = False
+                    powerup_system = PowerUpSystem()
 
             tab_bar.handle_event(event)
 
@@ -179,10 +214,16 @@ def main() -> None:
             elif tab_bar.active == 4:
                 achievements_view.handle_event(event)
 
+            elif tab_bar.active == 5:
+                settings_view.handle_event(event, config)
+
         # ----------------------------------------------------------------
         # Logika gry (zawsze w tle, niezależnie od aktywnej zakładki)
         # ----------------------------------------------------------------
         if not game_won:
+            # Aktualizuj power-upy
+            powerup_system.update(dt, config, state)
+
             for ball in balls:
                 ball.update(dt)
 
@@ -200,9 +241,10 @@ def main() -> None:
                 rings.append(CircleRing(config, (GAME_W, GAME_H), hp=state.get_ring_hp()))
                 spawn_timer = 0.0
 
-            # Aktualizuj okręgi
+            # Aktualizuj okręgi — ice spowalnia zmniejszanie
+            ice_mult = 0.05 if powerup_system.ice_active else 1.0
             for ring in rings:
-                ring.update(dt)
+                ring.update(dt, speed_multiplier=ice_mult)
 
             # Minimalny odstęp między okręgami (zapobiega nakładaniu)
             alive_rings = sorted([r for r in rings if r.alive], key=lambda r: r.radius)
@@ -220,7 +262,8 @@ def main() -> None:
                         collided = ring.check_collision(ball)
                         if was_alive and not ring.alive:
                             # Okrąg zniszczony — ustal przyczynę
-                            coins = state.on_ring_destroyed()
+                            gold_mult = getattr(ring, "gold_multiplier", 1.0)
+                            coins = state.on_ring_destroyed(gold_multiplier=gold_mult)
                             particles.explode_ring(ring.cx, ring.cy,
                                                    ring.radius, ring.color)
                             if not collided:
@@ -245,6 +288,12 @@ def main() -> None:
                             state.on_bounce()
                             break
 
+            # Kolizje piłka ↔ power-upy
+            for ball in balls:
+                for kind in powerup_system.check_collisions(ball):
+                    powerup_system.apply_effect(kind)
+                    _apply_powerup_to_game(kind)
+
             # Usuń całkowicie przezroczyste okręgi
             rings = [r for r in rings if not r.is_faded()]
             particles.update(dt)
@@ -264,6 +313,10 @@ def main() -> None:
         particles.draw(screen)
         for ball in balls:
             ball.draw(screen)
+
+        # Power-upy na planszy + HUD aktywnych efektów
+        powerup_system.draw(screen, font)
+        powerup_system.draw_active_effects_hud(screen, font)
 
         # HUD gry
         game_view.draw_hud(screen, font, state)
@@ -294,6 +347,9 @@ def main() -> None:
         elif tab_bar.active == 4:
             achievements_view.rect = content_rect
             achievements_view.draw(screen, font)
+        elif tab_bar.active == 5:
+            settings_view.rect = content_rect
+            settings_view.draw(screen, font, config)
         # Zakładka 0 (Gra) — tylko HUD, nic dodatkowego w panelu
 
         # Ekran wygranej

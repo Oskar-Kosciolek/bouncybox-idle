@@ -159,6 +159,7 @@ class PowerUpSystem:
     def apply_effect(self, kind: str, duration: float = 8.0) -> None:
         """Zapisuje aktywny efekt z czasem trwania (nadpisuje jeśli już aktywny)."""
         self.active_effects[kind] = duration
+        self.ice_active = "ice" in self.active_effects
 
     def draw(self, surface: pygame.Surface, font: pygame.font.Font) -> None:
         """Rysuje wszystkie power-upy na planszy."""
