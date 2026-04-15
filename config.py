@@ -34,6 +34,18 @@ class Config:
     # Efekty wizualne
     ball_trail_enabled: bool = False   # czy rysować smugę za piłką
 
+    # Power-upy
+    powerup_duration: float = 10.0        # czas wyświetlania na planszy (s)
+    powerup_max_visible: int = 2          # max jednocześnie widocznych
+    powerup_spawn_radius: float = 150.0   # promień strefy spawnu (koło od środka)
+    powerup_spawn_interval: float = 8.0   # co ile sekund próba spawnu
+
+    # Szanse spawnu per typ (0.0 - 1.0)
+    powerup_chance_gold: float = 0.3
+    powerup_chance_bomb: float = 0.2
+    powerup_chance_ice: float = 0.2
+    powerup_chance_mystery: float = 0.15
+
     def apply_upgrades(self, state) -> None:
         """Aktualizuje pola config na podstawie aktualnych poziomów ulepszeń i prestige."""
         # Prestige bonusy (permanentne)
