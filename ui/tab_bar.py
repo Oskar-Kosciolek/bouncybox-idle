@@ -11,6 +11,7 @@ class TabBar:
         ("[D]", "Drzewko"),
         ("[P]", "Prestige"),
         ("[A]", "Osiag."),
+        ("[U]", "Ustaw."),
     ]
 
     def __init__(self, x: int, y: int, width: int, height: int) -> None:
