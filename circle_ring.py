@@ -17,6 +17,7 @@ class CircleRing:
         self.base_color = (60, 120, 200)
         self.color = self.base_color   # zmienia się z HP
         self.exploded = False  # flaga — cząsteczki emitowane tylko raz
+        self.gold_multiplier: float = 1.0
 
         # Fade out po zniszczeniu
         self.alpha: float = 255.0
@@ -53,7 +54,7 @@ class CircleRing:
         b = int(200 * ratio)
         self.color = (r, g, b)
 
-    def update(self, dt: float) -> None:
+    def update(self, dt: float, speed_multiplier: float = 1.0) -> None:
         if not self.alive:
             self.alpha = max(0.0, self.alpha - 400 * dt)
             return
@@ -62,8 +63,8 @@ class CircleRing:
             self.holes = [(h + self.config.hole_move_speed * dt) % 360
                           for h in self.holes]
 
-        # Zmniejszanie — limit przekazywany z zewnątrz
-        self.radius -= self.config.ring_shrink_speed * dt
+        # Zmniejszanie — współczynnik prędkości (np. 0.05 gdy ice aktywny)
+        self.radius -= self.config.ring_shrink_speed * speed_multiplier * dt
 
     def is_point_in_hole(self, angle_deg: float) -> bool:
         """Sprawdź czy kąt mieści się w którejś dziurze."""
