@@ -15,14 +15,7 @@ from ui.prestige_view import PrestigeView
 from ui.achievements_view import AchievementsView
 from ui.notification import NotificationSystem
 
-WINDOW_W: int = 700
-WINDOW_H: int = 520
-GAME_W:   int = 520
-GAME_H:   int = 520
-PANEL_W:  int = WINDOW_W - GAME_W   # 180px
-
-FPS: int = 60
-BG_COLOR: tuple[int, int, int] = (18, 18, 24)
+from constants import GAME_W, GAME_H, WINDOW_W, WINDOW_H, PANEL_W, FPS, BG_COLOR
 
 GAME_AREA:  pygame.Rect = pygame.Rect(0, 0, GAME_W, GAME_H)
 PANEL_AREA: pygame.Rect = pygame.Rect(GAME_W, 0, PANEL_W, WINDOW_H)
