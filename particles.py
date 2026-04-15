@@ -43,9 +43,9 @@ class ParticleSystem:
             speed = random.uniform(60, 220)
             vx = math.cos(angle) * speed + random.uniform(-20, 20)
             vy = math.sin(angle) * speed + random.uniform(-20, 20)
-            r = min(255, int(color[0] + random.randint(-30, 30)))
-            g = min(255, int(color[1] + random.randint(-30, 30)))
-            b = min(255, int(color[2] + random.randint(-30, 30)))
+            r = min(255, max(0, int(color[0] + random.randint(-30, 30))))
+            g = min(255, max(0, int(color[1] + random.randint(-30, 30))))
+            b = min(255, max(0, int(color[2] + random.randint(-30, 30))))
             lifetime = random.uniform(0.4, 1.2)
             self.particles.append(Particle(px, py, vx, vy, (r, g, b), lifetime))
 

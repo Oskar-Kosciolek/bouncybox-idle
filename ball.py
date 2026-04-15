@@ -46,7 +46,7 @@ class Ball:
         self.vx = math.cos(angle) * self.base_speed
         self.vy = math.sin(angle) * self.base_speed
 
-        self.collision_cooldown = 0.05
+        self.collision_cooldown = 0.01
 
     def reset(self, x: float, y: float) -> None:
         self.x = x

@@ -23,10 +23,11 @@ class CircleRing:
 
         # Wygeneruj dziury równomiernie rozłożone, z losowym przesunięciem całości
         self.holes: list[float] = []
-        step = 360.0 / config.hole_count
-        offset = random.uniform(0, 360)
-        for i in range(config.hole_count):
-            self.holes.append((offset + i * step) % 360)
+        if config.hole_count > 0:
+            step = 360.0 / config.hole_count
+            offset = random.uniform(0, 360)
+            for i in range(config.hole_count):
+                self.holes.append((offset + i * step) % 360)
 
     def hit(self, damage: int = 10) -> bool:
         """Wywołaj przy odbiciu piłki od okręgu.
@@ -121,7 +122,7 @@ class CircleRing:
             ball.bounce_radial(nx, ny)
 
         # Odbicie zadaje obrażenia
-        self.hit(10)
+        self.hit(self.config.ball_damage)
 
         return True
 
