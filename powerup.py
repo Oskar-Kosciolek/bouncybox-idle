@@ -2,8 +2,6 @@ import pygame
 import math
 import random
 
-from constants import GAME_W, GAME_H
-
 # Kolory per typ power-upa
 POWERUP_COLORS: dict[str, tuple[int, int, int]] = {
     "gold":    (255, 200,  40),
@@ -92,7 +90,7 @@ class PowerUpSystem:
         self.active_effects: dict[str, float] = {}
         self.ice_active: bool = False
 
-    def update(self, dt: float, config, state) -> None:
+    def update(self, dt: float, config, state, cx: int, cy: int) -> None:
         """Aktualizuje power-upy i aktywne efekty, próbuje spawn."""
         # Aktualizuj istniejące power-upy
         self.powerups = [
@@ -112,9 +110,9 @@ class PowerUpSystem:
         self.spawn_timer += dt
         if self.spawn_timer >= config.powerup_spawn_interval:
             self.spawn_timer = 0.0
-            self._try_spawn(config, state)
+            self._try_spawn(config, state, cx, cy)
 
-    def _try_spawn(self, config, state) -> None:
+    def _try_spawn(self, config, state, cx: int, cy: int) -> None:
         """Próbuje dodać nowy power-up do puli jeśli limit nie przekroczony."""
         if len(self.powerups) >= config.powerup_max_visible:
             return
@@ -137,8 +135,6 @@ class PowerUpSystem:
         kind = random.choice(available)
 
         # Losowa pozycja w kole od środka planszy
-        cx = GAME_W // 2
-        cy = GAME_H // 2
         angle = random.uniform(0, math.pi * 2)
         r = random.uniform(0, config.powerup_spawn_radius)
         x = cx + math.cos(angle) * r
@@ -167,9 +163,10 @@ class PowerUpSystem:
             p.draw(surface, font)
 
     def draw_active_effects_hud(self, surface: pygame.Surface,
-                                font: pygame.font.Font) -> None:
+                                font: pygame.font.Font,
+                                game_w: int) -> None:
         """Rysuje aktywne efekty w prawym górnym rogu obszaru gry."""
-        x = GAME_W - 10
+        x = game_w - 10
         y = 10
         for kind, time_left in self.active_effects.items():
             color = POWERUP_COLORS[kind]

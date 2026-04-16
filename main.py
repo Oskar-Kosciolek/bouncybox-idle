@@ -19,10 +19,15 @@ from powerup import PowerUpSystem
 from ui.settings_view import SettingsView
 from ui.floating_text import FloatingTextSystem
 
-from constants import GAME_W, GAME_H, WINDOW_W, WINDOW_H, PANEL_W, FPS, BG_COLOR
+from constants import PANEL_W, FPS, BG_COLOR
 
-GAME_AREA:  pygame.Rect = pygame.Rect(0, 0, GAME_W, GAME_H)
-PANEL_AREA: pygame.Rect = pygame.Rect(GAME_W, 0, PANEL_W, WINDOW_H)
+
+def update_dimensions(screen: pygame.Surface) -> tuple[int, int, int, int]:
+    current_game_w = screen.get_width() - PANEL_W
+    current_game_h = screen.get_height()
+    cx = current_game_w // 2
+    cy = current_game_h // 2
+    return current_game_w, current_game_h, cx, cy
 
 
 def _make_balls(cx: float, cy: float, config: Config, count: int) -> list[Ball]:
@@ -75,7 +80,7 @@ def _notify_achievements(newly_unlocked: list,
 
 def main() -> None:
     pygame.init()
-    screen = pygame.display.set_mode((WINDOW_W, WINDOW_H))
+    screen = pygame.display.set_mode((700, 520), pygame.RESIZABLE)
     pygame.display.set_caption("bouncybox idle")
     clock = pygame.time.Clock()
 
@@ -86,19 +91,19 @@ def main() -> None:
     state = GameState()
     config.apply_upgrades(state)
 
-    cx = GAME_W // 2
-    cy = GAME_H // 2
+    current_game_w, current_game_h, cx, cy = update_dimensions(screen)
 
     particles = ParticleSystem()
-    rings: list[CircleRing] = [CircleRing(config, (GAME_W, GAME_H), hp=state.get_ring_hp())]
+    rings: list[CircleRing] = [CircleRing(config, (current_game_w, current_game_h), hp=state.get_ring_hp())]
     balls: list[Ball] = _make_balls(cx, cy, config, 1)
     floating_texts = FloatingTextSystem()
     game_won: bool = False
 
-    tab_bar = TabBar(GAME_W, 0, PANEL_W, WINDOW_H)
+    PANEL_AREA = pygame.Rect(current_game_w, 0, PANEL_W, current_game_h)
+    tab_bar = TabBar(current_game_w, 0, PANEL_W, current_game_h)
     shop_view = ShopView(PANEL_AREA, state, UPGRADES)
     tree_view = TreeView(PANEL_AREA, state, UPGRADES)
-    game_view = GameView(GAME_AREA)
+    game_view = GameView(pygame.Rect(0, 0, current_game_w, current_game_h))
     prestige_view = PrestigeView(PANEL_AREA, state, PRESTIGE_UPGRADES)
     achievements_view = AchievementsView(PANEL_AREA, state, ACHIEVEMENTS)
     notifications = NotificationSystem()
@@ -110,7 +115,7 @@ def main() -> None:
         nonlocal rings, balls, particles, game_won, floating_texts
         if state.prestige():
             config.apply_upgrades(state)
-            rings = [CircleRing(config, (GAME_W, GAME_H), hp=state.get_ring_hp())]
+            rings = [CircleRing(config, (current_game_w, current_game_h), hp=state.get_ring_hp())]
             # Piłka startowa + dodatkowe z ulepszenia prestige_extra_ball
             balls = [Ball(cx, cy, config)]
             for i in range(state.prestige_extra_ball):
@@ -164,13 +169,21 @@ def main() -> None:
             if event.type == pygame.QUIT:
                 running = False
 
+            if event.type == pygame.VIDEORESIZE:
+                current_game_w, current_game_h, cx, cy = update_dimensions(screen)
+                # Przenieś okręgi i powerupy do nowego środka
+                for ring in rings:
+                    ring.cx = cx
+                    ring.cy = cy
+                powerup_system = PowerUpSystem()  # reset powerupów — nowe pozycje
+
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     running = False
                 if event.key == pygame.K_r:
                     # Nowa runda — zachowuje monety, ulepszenia i falę
                     config.apply_upgrades(state)
-                    rings = [CircleRing(config, (GAME_W, GAME_H), hp=state.get_ring_hp())]
+                    rings = [CircleRing(config, (current_game_w, current_game_h), hp=state.get_ring_hp())]
                     balls = _make_balls(cx, cy, config,
                                        state.upgrade_multi_ball + 1)
                     particles = ParticleSystem()
@@ -182,7 +195,7 @@ def main() -> None:
                     print("Pelny reset!")
                     state = GameState()
                     config.apply_upgrades(state)
-                    rings = [CircleRing(config, (GAME_W, GAME_H), hp=state.get_ring_hp())]
+                    rings = [CircleRing(config, (current_game_w, current_game_h), hp=state.get_ring_hp())]
                     balls = _make_balls(cx, cy, config, 1)
                     particles = ParticleSystem()
                     floating_texts = FloatingTextSystem()
@@ -224,7 +237,7 @@ def main() -> None:
         # ----------------------------------------------------------------
         if not game_won:
             # Aktualizuj power-upy
-            powerup_system.update(dt, config, state)
+            powerup_system.update(dt, config, state, cx, cy)
 
             for ball in balls:
                 ball.update(dt)
@@ -232,15 +245,15 @@ def main() -> None:
             # Wylot poza ekran = wygrana
             for ball in balls:
                 margin = ball.radius
-                if (ball.x < -margin or ball.x > GAME_W + margin or
-                        ball.y < -margin or ball.y > GAME_H + margin):
+                if (ball.x < -margin or ball.x > current_game_w + margin or
+                        ball.y < -margin or ball.y > current_game_h + margin):
                     game_won = True
                     break
 
             # Spawn nowego okręgu gdy lista jest pusta
             if not rings:
                 hp = state.get_ring_hp()
-                rings.append(CircleRing(config, (GAME_W, GAME_H), hp=hp))
+                rings.append(CircleRing(config, (current_game_w, current_game_h), hp=hp))
 
             # Aktualizuj okręgi — ice spowalnia zmniejszanie
             ice_mult = 0.05 if powerup_system.ice_active else 1.0
@@ -336,7 +349,7 @@ def main() -> None:
 
         # Power-upy na planszy + HUD aktywnych efektów
         powerup_system.draw(screen, font)
-        powerup_system.draw_active_effects_hud(screen, font)
+        powerup_system.draw_active_effects_hud(screen, font, current_game_w)
 
         # HUD gry
         game_view.draw_hud(screen, font, state)
@@ -346,14 +359,14 @@ def main() -> None:
         notifications.draw(screen, font)
 
         # Separator między grą a panelem
-        pygame.draw.line(screen, (40, 40, 55), (GAME_W, 0), (GAME_W, WINDOW_H), 2)
+        pygame.draw.line(screen, (40, 40, 55), (current_game_w, 0), (current_game_w, current_game_h), 2)
 
         # Pasek zakładek
         tab_bar.draw(screen, font)
 
         # Aktywny widok w panelu (pod zakładkami)
         tabs_h = len(tab_bar.TABS) * tab_bar.tab_height
-        content_rect = pygame.Rect(GAME_W, tabs_h, PANEL_W, WINDOW_H - tabs_h)
+        content_rect = pygame.Rect(current_game_w, tabs_h, PANEL_W, current_game_h - tabs_h)
 
         if tab_bar.active == 1:
             shop_view.rect = content_rect
@@ -376,9 +389,9 @@ def main() -> None:
         if game_won:
             win_font = pygame.font.SysFont("segoeui", 52, bold=True)
             txt = win_font.render("Win!", True, (255, 220, 80))
-            screen.blit(txt, txt.get_rect(center=(GAME_W // 2, GAME_H // 2)))
+            screen.blit(txt, txt.get_rect(center=(cx, cy)))
             sub = font.render("R \u2014 zagraj ponownie", True, (180, 180, 200))
-            screen.blit(sub, sub.get_rect(center=(GAME_W // 2, GAME_H // 2 + 50)))
+            screen.blit(sub, sub.get_rect(center=(cx, cy + 50)))
 
         pygame.display.flip()
 
