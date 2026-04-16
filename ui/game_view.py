@@ -5,7 +5,6 @@ if TYPE_CHECKING:
     from game_state import GameState
 
 
-_COL_HUD_BG    = (18, 18, 24, 180)   # półprzezroczyste tło HUD
 _COL_TEXT      = (220, 220, 240)
 _COL_COIN      = (220, 200, 80)
 _COL_WAVE      = (100, 180, 255)
@@ -17,16 +16,17 @@ _COL_BAR_FULL  = (100, 220, 120)
 class GameView:
     """Nakładka HUD rysowana w obszarze gry."""
 
-    def __init__(self, rect: pygame.Rect) -> None:
-        self.rect = rect   # obszar gry (np. 520x520)
+    def __init__(self) -> None:
+        pass
 
     def draw_hud(self, surface: pygame.Surface,
                  font: pygame.font.Font,
-                 state: "GameState") -> None:
+                 state: "GameState",
+                 current_game_w: int,
+                 current_game_h: int) -> None:
         """Rysuje HUD na dole obszaru gry."""
         bar_h = 36
-        hud_rect = pygame.Rect(self.rect.x, self.rect.bottom - bar_h,
-                               self.rect.width, bar_h)
+        hud_rect = pygame.Rect(0, current_game_h - bar_h, current_game_w, bar_h)
 
         # Półprzezroczyste tło (przez surface z alpha)
         hud_surf = pygame.Surface((hud_rect.width, hud_rect.height), pygame.SRCALPHA)

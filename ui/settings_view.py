@@ -1,6 +1,9 @@
 import pygame
 from typing import TYPE_CHECKING
 
+from constants import PANEL_W
+from ui.tab_bar import TAB_TOTAL_HEIGHT
+
 if TYPE_CHECKING:
     from config import Config
 
@@ -35,8 +38,8 @@ _PAD   = 10   # padding poziomy
 class SettingsView:
     """Widok developerski — suwaki do tuningu Config."""
 
-    def __init__(self, rect: pygame.Rect) -> None:
-        self.rect = rect
+    def __init__(self) -> None:
+        self.rect: pygame.Rect | None = None
         self._dragging: int | None = None   # indeks aktualnie przeciąganego suwaka
         self.scroll: float = 0.0            # offset scrolla w pikselach
 
@@ -44,7 +47,10 @@ class SettingsView:
     # Zdarzenia
     # ------------------------------------------------------------------
 
-    def handle_event(self, event: pygame.event.Event, config: "Config") -> None:
+    def handle_event(self, event: pygame.event.Event, config: "Config",
+                     current_game_w: int, current_game_h: int) -> None:
+        self.rect = pygame.Rect(current_game_w, TAB_TOTAL_HEIGHT,
+                                PANEL_W, current_game_h - TAB_TOTAL_HEIGHT)
         if event.type == pygame.MOUSEWHEEL:
             self.scroll -= event.y * 20
             max_scroll = max(0.0, len(_SLIDERS) * _ROW_H - self.rect.height + 30)
@@ -79,7 +85,9 @@ class SettingsView:
     # ------------------------------------------------------------------
 
     def draw(self, surface: pygame.Surface, font: pygame.font.Font,
-             config: "Config") -> None:
+             config: "Config", current_game_w: int, current_game_h: int) -> None:
+        self.rect = pygame.Rect(current_game_w, TAB_TOTAL_HEIGHT,
+                                PANEL_W, current_game_h - TAB_TOTAL_HEIGHT)
         pygame.draw.rect(surface, _COL_BG, self.rect)
 
         # Przytnij do obszaru panelu

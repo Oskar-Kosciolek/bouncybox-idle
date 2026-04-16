@@ -99,16 +99,15 @@ def main() -> None:
     floating_texts = FloatingTextSystem()
     game_won: bool = False
 
-    PANEL_AREA = pygame.Rect(current_game_w, 0, PANEL_W, current_game_h)
-    tab_bar = TabBar(current_game_w, 0, PANEL_W, current_game_h)
-    shop_view = ShopView(PANEL_AREA, state, UPGRADES)
-    tree_view = TreeView(PANEL_AREA, state, UPGRADES)
-    game_view = GameView(pygame.Rect(0, 0, current_game_w, current_game_h))
-    prestige_view = PrestigeView(PANEL_AREA, state, PRESTIGE_UPGRADES)
-    achievements_view = AchievementsView(PANEL_AREA, state, ACHIEVEMENTS)
+    tab_bar = TabBar(PANEL_W)
+    shop_view = ShopView(state, UPGRADES)
+    tree_view = TreeView(state, UPGRADES)
+    game_view = GameView()
+    prestige_view = PrestigeView(state, PRESTIGE_UPGRADES)
+    achievements_view = AchievementsView(state, ACHIEVEMENTS)
     notifications = NotificationSystem()
     powerup_system = PowerUpSystem()
-    settings_view = SettingsView(PANEL_AREA)
+    settings_view = SettingsView()
 
     def do_prestige() -> None:
         """Callback wywoływany po kliknięciu przycisku PRESTIGE."""
@@ -206,12 +205,12 @@ def main() -> None:
                     game_won = False
                     powerup_system = PowerUpSystem()
 
-            tab_bar.handle_event(event)
+            tab_bar.handle_event(event, current_game_w)
 
             if tab_bar.active == 1:
                 # Sklep — śledź zmiany stanu po zdarzeniu
                 prev_hash = str(state.__dict__)
-                shop_view.handle_event(event)
+                shop_view.handle_event(event, current_game_w, current_game_h)
                 if str(state.__dict__) != prev_hash:
                     config.apply_upgrades(state)
                     # Aktualizuj radius już istniejących piłek
@@ -224,13 +223,13 @@ def main() -> None:
                     _notify_achievements(newly_unlocked, notifications)
 
             elif tab_bar.active == 3:
-                prestige_view.handle_event(event, do_prestige)
+                prestige_view.handle_event(event, do_prestige, current_game_w, current_game_h)
 
             elif tab_bar.active == 4:
-                achievements_view.handle_event(event)
+                achievements_view.handle_event(event, current_game_w, current_game_h)
 
             elif tab_bar.active == 5:
-                settings_view.handle_event(event, config)
+                settings_view.handle_event(event, config, current_game_w, current_game_h)
 
         # ----------------------------------------------------------------
         # Logika gry (zawsze w tle, niezależnie od aktywnej zakładki)
@@ -352,7 +351,7 @@ def main() -> None:
         powerup_system.draw_active_effects_hud(screen, font, current_game_w)
 
         # HUD gry
-        game_view.draw_hud(screen, font, state)
+        game_view.draw_hud(screen, font, state, current_game_w, current_game_h)
 
         # Powiadomienia (nad obszarem gry)
         notifications.update(dt)
@@ -362,27 +361,19 @@ def main() -> None:
         pygame.draw.line(screen, (40, 40, 55), (current_game_w, 0), (current_game_w, current_game_h), 2)
 
         # Pasek zakładek
-        tab_bar.draw(screen, font)
+        tab_bar.draw(screen, font, current_game_w, current_game_h)
 
         # Aktywny widok w panelu (pod zakładkami)
-        tabs_h = len(tab_bar.TABS) * tab_bar.tab_height
-        content_rect = pygame.Rect(current_game_w, tabs_h, PANEL_W, current_game_h - tabs_h)
-
         if tab_bar.active == 1:
-            shop_view.rect = content_rect
-            shop_view.draw(screen, font)
+            shop_view.draw(screen, font, current_game_w, current_game_h)
         elif tab_bar.active == 2:
-            tree_view.rect = content_rect
-            tree_view.draw(screen, font)
+            tree_view.draw(screen, font, current_game_w, current_game_h)
         elif tab_bar.active == 3:
-            prestige_view.rect = content_rect
-            prestige_view.draw(screen, font)
+            prestige_view.draw(screen, font, current_game_w, current_game_h)
         elif tab_bar.active == 4:
-            achievements_view.rect = content_rect
-            achievements_view.draw(screen, font)
+            achievements_view.draw(screen, font, current_game_w, current_game_h)
         elif tab_bar.active == 5:
-            settings_view.rect = content_rect
-            settings_view.draw(screen, font, config)
+            settings_view.draw(screen, font, config, current_game_w, current_game_h)
         # Zakładka 0 (Gra) — tylko HUD, nic dodatkowego w panelu
 
         # Ekran wygranej

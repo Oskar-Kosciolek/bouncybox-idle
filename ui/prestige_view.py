@@ -1,6 +1,9 @@
 import pygame
 from typing import TYPE_CHECKING, Callable
 
+from constants import PANEL_W
+from ui.tab_bar import TAB_TOTAL_HEIGHT
+
 if TYPE_CHECKING:
     from game_state import GameState
     from upgrade_tree import PrestigeUpgrade
@@ -28,10 +31,10 @@ _PBTN_H  = 38    # wysokość przycisku PRESTIGE
 class PrestigeView:
     """Widok ekranu prestige — przycisk resetu i ulepszenia permanentne."""
 
-    def __init__(self, rect: pygame.Rect,
+    def __init__(self,
                  state: "GameState",
                  prestige_upgrades: list["PrestigeUpgrade"]) -> None:
-        self.rect = rect
+        self.rect: pygame.Rect | None = None
         self.state = state
         self.prestige_upgrades = prestige_upgrades
         self.scroll: int = 0
@@ -41,8 +44,11 @@ class PrestigeView:
     # ------------------------------------------------------------------
 
     def handle_event(self, event: pygame.event.Event,
-                     on_prestige_callback: Callable[[], None]) -> None:
+                     on_prestige_callback: Callable[[], None],
+                     current_game_w: int, current_game_h: int) -> None:
         """Obsługuje kliknięcia przycisku PRESTIGE i zakupów ulepszeń."""
+        self.rect = pygame.Rect(current_game_w, TAB_TOTAL_HEIGHT,
+                                PANEL_W, current_game_h - TAB_TOTAL_HEIGHT)
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             self._handle_click(event.pos, on_prestige_callback)
         elif event.type == pygame.MOUSEWHEEL:
@@ -70,8 +76,11 @@ class PrestigeView:
     # Rysowanie
     # ------------------------------------------------------------------
 
-    def draw(self, surface: pygame.Surface, font: pygame.font.Font) -> None:
+    def draw(self, surface: pygame.Surface, font: pygame.font.Font,
+             current_game_w: int, current_game_h: int) -> None:
         """Rysuje cały widok prestige."""
+        self.rect = pygame.Rect(current_game_w, TAB_TOTAL_HEIGHT,
+                                PANEL_W, current_game_h - TAB_TOTAL_HEIGHT)
         pygame.draw.rect(surface, _COL_BG, self.rect)
 
         y = self.rect.y + 6

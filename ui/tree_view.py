@@ -2,6 +2,9 @@ import pygame
 import math
 from typing import TYPE_CHECKING
 
+from constants import PANEL_W
+from ui.tab_bar import TAB_TOTAL_HEIGHT
+
 if TYPE_CHECKING:
     from game_state import GameState
     from upgrade_tree import Upgrade
@@ -33,10 +36,10 @@ _HEADER_H = 36    # wysokość nagłówka gałęzi
 class TreeView:
     """Wizualne drzewko ulepszeń — 3 kolumny (ball / rings / economy)."""
 
-    def __init__(self, rect: pygame.Rect,
+    def __init__(self,
                  state: "GameState",
                  upgrades: list["Upgrade"]) -> None:
-        self.rect = rect
+        self.rect: pygame.Rect | None = None
         self.state = state
         self.upgrades = upgrades
 
@@ -44,8 +47,11 @@ class TreeView:
     # Rysowanie
     # ------------------------------------------------------------------
 
-    def draw(self, surface: pygame.Surface, font: pygame.font.Font) -> None:
+    def draw(self, surface: pygame.Surface, font: pygame.font.Font,
+             current_game_w: int, current_game_h: int) -> None:
         """Rysuje drzewko ulepszeń."""
+        self.rect = pygame.Rect(current_game_w, TAB_TOTAL_HEIGHT,
+                                PANEL_W, current_game_h - TAB_TOTAL_HEIGHT)
         pygame.draw.rect(surface, _COL_BG, self.rect)
 
         col_w = self.rect.width // 3

@@ -1,6 +1,9 @@
 import pygame
 from typing import TYPE_CHECKING
 
+from constants import PANEL_W
+from ui.tab_bar import TAB_TOTAL_HEIGHT
+
 if TYPE_CHECKING:
     from game_state import GameState
     from upgrade_tree import Upgrade
@@ -38,10 +41,10 @@ _BRANCH_H  = 28    # wysokość paska gałęzi
 class ShopView:
     """Widok sklepu z listą ulepszeń i możliwością zakupu."""
 
-    def __init__(self, rect: pygame.Rect,
+    def __init__(self,
                  state: "GameState",
                  upgrades: list["Upgrade"]) -> None:
-        self.rect = rect
+        self.rect: pygame.Rect | None = None
         self.state = state
         self.upgrades = upgrades
         self.active_branch: str = "ball"
@@ -51,8 +54,11 @@ class ShopView:
     # Obsługa zdarzeń
     # ------------------------------------------------------------------
 
-    def handle_event(self, event: pygame.event.Event) -> None:
+    def handle_event(self, event: pygame.event.Event,
+                     current_game_w: int, current_game_h: int) -> None:
         """Obsługuje kliknięcia w przyciski gałęzi i zakupy ulepszeń."""
+        self.rect = pygame.Rect(current_game_w, TAB_TOTAL_HEIGHT,
+                                PANEL_W, current_game_h - TAB_TOTAL_HEIGHT)
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             self._handle_click(event.pos)
         elif event.type == pygame.MOUSEWHEEL:
@@ -81,8 +87,11 @@ class ShopView:
     # Rysowanie
     # ------------------------------------------------------------------
 
-    def draw(self, surface: pygame.Surface, font: pygame.font.Font) -> None:
+    def draw(self, surface: pygame.Surface, font: pygame.font.Font,
+             current_game_w: int, current_game_h: int) -> None:
         """Rysuje cały widok sklepu."""
+        self.rect = pygame.Rect(current_game_w, TAB_TOTAL_HEIGHT,
+                                PANEL_W, current_game_h - TAB_TOTAL_HEIGHT)
         pygame.draw.rect(surface, _COL_BG, self.rect)
 
         # Nagłówek

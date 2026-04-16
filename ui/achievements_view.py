@@ -1,6 +1,9 @@
 import pygame
 from typing import TYPE_CHECKING
 
+from constants import PANEL_W
+from ui.tab_bar import TAB_TOTAL_HEIGHT
+
 if TYPE_CHECKING:
     from game_state import GameState
     from achievements import Achievement
@@ -25,10 +28,10 @@ _HDR_H  = 28    # wysokość nagłówka
 class AchievementsView:
     """Widok listy osiągnięć — odblokowane i zablokowane."""
 
-    def __init__(self, rect: pygame.Rect,
+    def __init__(self,
                  state: "GameState",
                  achievements: list["Achievement"]) -> None:
-        self.rect = rect
+        self.rect: pygame.Rect | None = None
         self.state = state
         self.achievements = achievements
         self.scroll: int = 0
@@ -37,8 +40,11 @@ class AchievementsView:
     # Obsługa zdarzeń
     # ------------------------------------------------------------------
 
-    def handle_event(self, event: pygame.event.Event) -> None:
+    def handle_event(self, event: pygame.event.Event,
+                     current_game_w: int, current_game_h: int) -> None:
         """Obsługuje scrollowanie listy osiągnięć."""
+        self.rect = pygame.Rect(current_game_w, TAB_TOTAL_HEIGHT,
+                                PANEL_W, current_game_h - TAB_TOTAL_HEIGHT)
         if event.type == pygame.MOUSEWHEEL:
             if self.rect.collidepoint(pygame.mouse.get_pos()):
                 self._scroll(event.y * -20)
@@ -47,8 +53,11 @@ class AchievementsView:
     # Rysowanie
     # ------------------------------------------------------------------
 
-    def draw(self, surface: pygame.Surface, font: pygame.font.Font) -> None:
+    def draw(self, surface: pygame.Surface, font: pygame.font.Font,
+             current_game_w: int, current_game_h: int) -> None:
         """Rysuje cały widok osiągnięć."""
+        self.rect = pygame.Rect(current_game_w, TAB_TOTAL_HEIGHT,
+                                PANEL_W, current_game_h - TAB_TOTAL_HEIGHT)
         pygame.draw.rect(surface, _COL_BG, self.rect)
 
         # Nagłówek z licznikiem
