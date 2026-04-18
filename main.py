@@ -20,6 +20,7 @@ from ui.settings_view import SettingsView
 from ui.floating_text import FloatingTextSystem
 
 from constants import PANEL_W, FPS, BG_COLOR
+from save_manager import save_game, load_game, delete_save
 
 
 def update_dimensions(screen: pygame.Surface) -> tuple[int, int, int, int]:
@@ -88,7 +89,7 @@ def main() -> None:
     font = pygame.font.SysFont("segoeui", 13)
 
     config = Config()
-    state = GameState()
+    state = load_game() or GameState()
     config.apply_upgrades(state)
 
     current_game_w, current_game_h, cx, cy = update_dimensions(screen)
@@ -109,6 +110,8 @@ def main() -> None:
     notifications = NotificationSystem()
     powerup_system = PowerUpSystem()
     settings_view = SettingsView()
+    autosave_timer: float = 0.0
+    AUTOSAVE_INTERVAL = 30.0
 
     def do_prestige() -> None:
         """Callback wywoływany po kliknięciu przycisku PRESTIGE."""
@@ -163,11 +166,18 @@ def main() -> None:
         dt = clock.tick(FPS) / 1000.0
         dt = min(dt, 0.01)
 
+        autosave_timer += dt
+        if autosave_timer >= AUTOSAVE_INTERVAL:
+            save_game(state)
+            autosave_timer = 0.0
+            notifications.add("Gra zapisana.", color=(100, 200, 100), lifetime=1.5)
+
         # ----------------------------------------------------------------
         # Zdarzenia
         # ----------------------------------------------------------------
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
+                save_game(state)
                 running = False
 
             if event.type == pygame.VIDEORESIZE:
@@ -186,6 +196,7 @@ def main() -> None:
 
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
+                    save_game(state)
                     running = False
                 if event.key == pygame.K_r:
                     # Nowa runda — zachowuje monety, ulepszenia i falę
@@ -198,8 +209,10 @@ def main() -> None:
                     game_won = False
                     powerup_system = PowerUpSystem()
                 if event.key == pygame.K_F5:
-                    # Pełny reset — wszystko od zera
-                    print("Pelny reset!")
+                    save_game(state)
+                    notifications.add("Zapisano!", color=(100, 200, 100), lifetime=1.5)
+                if event.key == pygame.K_F6:
+                    delete_save()
                     state = GameState()
                     config.apply_upgrades(state)
                     rings = [CircleRing(config, (current_game_w, current_game_h), hp=state.get_ring_hp())]
@@ -212,6 +225,7 @@ def main() -> None:
                     achievements_view.state = state
                     game_won = False
                     powerup_system = PowerUpSystem()
+                    notifications.add("Reset! Nowa gra.", color=(220, 80, 80), lifetime=2.0)
 
             tab_bar.handle_event(event, current_game_w)
 
