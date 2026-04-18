@@ -92,6 +92,7 @@ def main() -> None:
     config.apply_upgrades(state)
 
     current_game_w, current_game_h, cx, cy = update_dimensions(screen)
+    old_cx, old_cy = cx, cy
 
     particles = ParticleSystem()
     rings: list[CircleRing] = [CircleRing(config, (current_game_w, current_game_h), hp=state.get_ring_hp())]
@@ -160,6 +161,7 @@ def main() -> None:
     running = True
     while running:
         dt = clock.tick(FPS) / 1000.0
+        dt = min(dt, 0.01)
 
         # ----------------------------------------------------------------
         # Zdarzenia
@@ -170,10 +172,16 @@ def main() -> None:
 
             if event.type == pygame.VIDEORESIZE:
                 current_game_w, current_game_h, cx, cy = update_dimensions(screen)
+                
                 # Przenieś okręgi i powerupy do nowego środka
                 for ring in rings:
                     ring.cx = cx
                     ring.cy = cy
+
+                for ball in balls:
+                    ball.x = ball.x + cx - old_cx
+                    ball.y = ball.y + cy - old_cy
+
                 powerup_system = PowerUpSystem()  # reset powerupów — nowe pozycje
 
             if event.type == pygame.KEYDOWN:
@@ -384,6 +392,8 @@ def main() -> None:
             sub = font.render("R \u2014 zagraj ponownie", True, (180, 180, 200))
             screen.blit(sub, sub.get_rect(center=(cx, cy + 50)))
 
+        old_cx = cx
+        old_cy = cy
         pygame.display.flip()
 
     pygame.quit()
