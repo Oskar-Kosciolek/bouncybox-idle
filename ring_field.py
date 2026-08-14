@@ -2,7 +2,7 @@ import random
 
 from circle_ring import CircleRing
 from config import Config
-from ring_types import pick_type
+from ring_types import NORMAL, pick_type
 
 # Minimalny odstęp promieni między sąsiednimi okręgami. Nie jest wymuszany
 # na promieniach po fakcie — wynika z tego, kiedy wolno postawić nowy okrąg.
@@ -68,6 +68,8 @@ class RingField:
         for ring in self.rings:
             ring.update(dt, speed_multiplier=speed_multiplier)
 
+        self._resolve_splits(hp)
+
         self.rings = [r for r in self.rings if not r.is_faded()]
 
         # Żaden okrąg nie schodzi poniżej minimum — inaczej zwinąłby się do
@@ -85,6 +87,38 @@ class RingField:
         # Puste pole to gra bez celu
         if not self.alive():
             self.spawn(hp, wave)
+
+    def _resolve_splits(self, hp: int) -> None:
+        """Rozlicza okręgi, które zginęły od ostatniego wywołania.
+
+        Pole robi to samo, zamiast czekać na sygnał z pętli głównej — dzięki
+        temu podział działa także przy zabiciu bombą, która woła destroy()
+        z zupełnie innego miejsca.
+        """
+        for ring in list(self.rings):
+            if ring.alive or ring.split_resolved:
+                continue
+            ring.split_resolved = True
+            self._split(ring, hp)
+
+    def _split(self, parent: CircleRing, hp: int) -> None:
+        """Stawia dzieci wewnątrz martwego rodzica, o RING_GAP od siebie.
+
+        Dziecko musi zmieścić się powyżej ring_min_radius — poniżej urodziłoby
+        się w stanie zduszenia i od razu ukarało gracza. Podział świadomie
+        pomija limit ring_max_active: to jednorazowy wyskok, a limit pilnuje
+        tempa spawnu, nie sufitu absolutnego.
+        """
+        for i in range(parent.type.splits_into):
+            radius = parent.radius - RING_GAP * (i + 1)
+            if radius <= self.config.ring_min_radius:
+                break
+            child = CircleRing(self.config, self._size, hp=hp,
+                               ring_type=NORMAL)
+            child.radius = radius
+            child.cx = parent.cx
+            child.cy = parent.cy
+            self.rings.append(child)
 
     def clear(self, hp: int, wave: int) -> None:
         """Czyści pole i stawia jeden świeży okrąg."""

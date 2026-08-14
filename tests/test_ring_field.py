@@ -241,3 +241,100 @@ def test_high_wave_field_contains_special_rings():
         seen.update(r.type.id for r in field.rings)
 
     assert seen - {"normal"}
+
+
+def _splitting_ring(field, radius: float):
+    """Podmienia jedyny okrąg pola na dzielący się o zadanym promieniu."""
+    from ring_types import SPLITTING
+
+    ring = field.rings[0]
+    ring.type = SPLITTING
+    ring.radius = radius
+    return ring
+
+
+def test_destroyed_splitting_ring_spawns_two_children():
+    _, field = _field()
+    ring = _splitting_ring(field, radius=220.0)
+    ring.destroy()
+
+    field.update(1 / 240, hp=100, wave=6)
+
+    assert len(field.alive()) == 2
+
+
+def test_children_appear_inside_the_parent_one_gap_apart():
+    _, field = _field()
+    ring = _splitting_ring(field, radius=220.0)
+    ring.destroy()
+
+    field.update(1 / 240, hp=100, wave=6)
+
+    radii = sorted(r.radius for r in field.alive())
+    assert radii == [220.0 - 2 * RING_GAP, 220.0 - RING_GAP]
+
+
+def test_children_are_ordinary_rings():
+    """Inaczej podział kaskadowałby w nieskończoność."""
+    from ring_types import NORMAL
+
+    _, field = _field()
+    ring = _splitting_ring(field, radius=220.0)
+    ring.destroy()
+
+    field.update(1 / 240, hp=100, wave=6)
+
+    assert len(field.alive()) == 2
+    assert all(r.type is NORMAL for r in field.alive())
+
+
+def test_no_child_is_born_already_crushed():
+    """Dziecko poniżej ring_min_radius natychmiast wywołałoby karę."""
+    config, field = _field()
+    config.ring_min_radius = 30.0
+    ring = _splitting_ring(field, radius=100.0)
+    ring.destroy()
+
+    field.update(1 / 240, hp=100, wave=6)
+
+    # Miejsce starcza tylko na jedno dziecko: 100-35=65 mieści się,
+    # 100-70=30 wypadłoby dokładnie na progu zduszenia.
+    assert [r.radius for r in field.alive()] == [100.0 - RING_GAP]
+
+
+def test_splitting_ring_with_no_room_dies_without_children():
+    config, field = _field()
+    config.ring_min_radius = 30.0
+    ring = _splitting_ring(field, radius=50.0)
+    ring.destroy()
+
+    field.update(1 / 240, hp=100, wave=6)
+
+    # Zostaje wyłącznie okrąg dostawiony regułą "puste pole to gra bez celu"
+    assert all(r.radius == config.ring_start_radius for r in field.alive())
+
+
+def test_split_happens_only_once():
+    _, field = _field()
+    ring = _splitting_ring(field, radius=220.0)
+    ring.destroy()
+
+    field.update(1 / 240, hp=100, wave=6)
+    count_after_first = len(field.rings)
+    field.update(1 / 240, hp=100, wave=6)
+
+    # martwy rodzic (jeszcze nie wyblakł) + dwoje dzieci
+    assert count_after_first == 3
+    assert len(field.rings) == count_after_first
+
+
+def test_split_also_fires_for_rings_killed_outside_the_collision_loop():
+    """Bomba woła ring.destroy() z zupełnie innego miejsca w main.py —
+    podział musi zadziałać i wtedy."""
+    _, field = _field()
+    ring = _splitting_ring(field, radius=220.0)
+
+    ring.destroy()          # dokładnie to, co robi power-up bomba
+    field.update(1 / 240, hp=100, wave=6)
+
+    assert len(field.alive()) == 2
