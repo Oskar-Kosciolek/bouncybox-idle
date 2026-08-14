@@ -17,9 +17,9 @@ def test_apply_upgrades_twice_gives_same_result():
     assert config.hole_size == first_result
 
 
-def test_hole_never_swallows_whole_ring_at_max_upgrades():
-    """Dziura 360° oznaczałaby okrąg złożony wyłącznie z dziury — piłka
-    niszczyłaby go pierwszym dotknięciem. Max: 5x10° + 5x8° prestige = 90°."""
+def test_max_hole_size_is_recomputed_not_accumulated():
+    """Baza 10° + 5x10° z ulepszeń + 5x8° z prestige = 100°, niezależnie od
+    tego, ile razy apply_upgrades zostanie wywołane."""
     config = Config()
     state = GameState()
     state.upgrade_hole_size = 5
@@ -28,7 +28,7 @@ def test_hole_never_swallows_whole_ring_at_max_upgrades():
     for _ in range(20):          # 20 zakupów/awansów fali
         config.apply_upgrades(state)
 
-    assert config.hole_size == 90.0
+    assert config.hole_size == 100.0
 
 
 def test_shrink_speed_depends_only_on_current_wave():
@@ -63,4 +63,16 @@ def test_hole_count_does_not_accumulate_between_calls():
     for _ in range(5):
         config.apply_upgrades(state)
 
-    assert config.hole_count == 2
+    assert config.hole_count == 1 + 2   # baza + poziomy ulepszenia
+
+
+def test_fresh_game_ring_has_a_hole():
+    """Bez dziury świeży gracz nie zniszczy żadnego okręgu: przy 1 obrażeniu
+    na odbicie piłka nie zdejmie 100 HP, zanim stos zdusi ją na minimum.
+    Zero monet oznacza zero ulepszeń, czyli grę zablokowaną na starcie."""
+    config = Config()
+
+    config.apply_upgrades(GameState())
+
+    assert config.hole_count >= 1
+    assert config.hole_size > 0.0

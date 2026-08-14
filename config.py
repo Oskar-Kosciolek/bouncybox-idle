@@ -4,8 +4,13 @@ from dataclasses import dataclass
 # apply_upgrades startuje od nich za każdym razem, dzięki czemu jest
 # idempotentne: wielokrotne wywołanie daje ten sam wynik.
 BASE_BALL_RADIUS: int = 5
-BASE_HOLE_SIZE: float = 0.0
-BASE_HOLE_COUNT: int = 0
+
+# Każdy okrąg ma od startu jedną dziurę. Bez niej świeży gracz nie jest w
+# stanie zniszczyć niczego: przy 1 obrażeniu na odbicie piłka zdąży zadać
+# ~78 obrażeń, zanim okrąg dojdzie do minimum i zdusi ją przy 100 HP.
+# Zero zabitych okręgów to zero monet, czyli gra zablokowana na starcie.
+BASE_HOLE_SIZE: float = 10.0
+BASE_HOLE_COUNT: int = 1
 BASE_HOLE_MOVE_SPEED: float = 10.0
 BASE_RING_SHRINK_SPEED: float = 1.0
 
