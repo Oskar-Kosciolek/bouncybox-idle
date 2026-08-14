@@ -1,5 +1,8 @@
+import random
+
 from circle_ring import CircleRing
 from config import Config
+from ring_types import pick_type
 
 # Minimalny odstęp promieni między sąsiednimi okręgami. Nie jest wymuszany
 # na promieniach po fakcie — wynika z tego, kiedy wolno postawić nowy okrąg.
@@ -15,16 +18,19 @@ class RingField:
     wewnętrznego okręgu — stąd `alive()` zwraca je uporządkowane od środka.
     """
 
-    def __init__(self, config: Config, size: tuple[int, int], hp: int) -> None:
+    def __init__(self, config: Config, size: tuple[int, int], hp: int,
+                 wave: int = 1, rng: random.Random | None = None) -> None:
         self.config = config
         self.rings: list[CircleRing] = []
         self.spawn_timer: float = 0.0
         self._size = size
-        self.spawn(hp)
+        self._rng = rng if rng is not None else random.Random()
+        self.spawn(hp, wave)
 
-    def spawn(self, hp: int) -> CircleRing:
+    def spawn(self, hp: int, wave: int) -> CircleRing:
         """Stawia nowy okrąg na zewnętrznej krawędzi pola."""
-        ring = CircleRing(self.config, self._size, hp=hp)
+        ring = CircleRing(self.config, self._size, hp=hp,
+                          ring_type=pick_type(wave, self._rng))
         self.rings.append(ring)
         return ring
 
@@ -56,7 +62,8 @@ class RingField:
             return False
         return alive[-1].radius <= self.config.ring_start_radius - RING_GAP
 
-    def update(self, dt: float, hp: int, speed_multiplier: float = 1.0) -> None:
+    def update(self, dt: float, hp: int, wave: int,
+               speed_multiplier: float = 1.0) -> None:
         """Zwęża okręgi, sprząta wyblakłe i dostawia nowe co interwał."""
         for ring in self.rings:
             ring.update(dt, speed_multiplier=speed_multiplier)
@@ -73,17 +80,17 @@ class RingField:
         if self.spawn_timer >= self.config.ring_spawn_interval:
             self.spawn_timer = 0.0
             if self.has_room():
-                self.spawn(hp)
+                self.spawn(hp, wave)
 
         # Puste pole to gra bez celu
         if not self.alive():
-            self.spawn(hp)
+            self.spawn(hp, wave)
 
-    def clear(self, hp: int) -> None:
+    def clear(self, hp: int, wave: int) -> None:
         """Czyści pole i stawia jeden świeży okrąg."""
         self.rings = []
         self.spawn_timer = 0.0
-        self.spawn(hp)
+        self.spawn(hp, wave)
 
     def recenter(self, size: tuple[int, int]) -> None:
         """Przenosi okręgi do środka planszy po zmianie rozmiaru okna."""

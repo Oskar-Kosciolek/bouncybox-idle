@@ -99,7 +99,8 @@ def main() -> None:
     old_cx, old_cy = cx, cy
 
     particles = ParticleSystem()
-    field = RingField(config, (current_game_w, current_game_h), hp=state.get_ring_hp())
+    field = RingField(config, (current_game_w, current_game_h),
+                      hp=state.get_ring_hp(), wave=state.wave)
     balls: list[Ball] = _make_balls(cx, cy, config, 1)
     floating_texts = FloatingTextSystem()
     game_won: bool = False
@@ -125,7 +126,7 @@ def main() -> None:
         nonlocal balls, particles, game_won, floating_texts
         if state.prestige():
             config.apply_upgrades(state)
-            field.clear(hp=state.get_ring_hp())
+            field.clear(hp=state.get_ring_hp(), wave=state.wave)
             # Piłka startowa + dodatkowe z ulepszenia prestige_extra_ball
             balls = [Ball(cx, cy, config)]
             for i in range(state.prestige_extra_ball):
@@ -212,7 +213,7 @@ def main() -> None:
                 if event.key == pygame.K_r:
                     # Nowa runda — zachowuje monety, ulepszenia i falę
                     config.apply_upgrades(state)
-                    field.clear(hp=state.get_ring_hp())
+                    field.clear(hp=state.get_ring_hp(), wave=state.wave)
                     balls = _make_balls(cx, cy, config,
                                        state.upgrade_multi_ball + 1)
                     particles = ParticleSystem()
@@ -228,7 +229,7 @@ def main() -> None:
                     delete_save()
                     state = GameState()
                     config.apply_upgrades(state)
-                    field.clear(hp=state.get_ring_hp())
+                    field.clear(hp=state.get_ring_hp(), wave=state.wave)
                     balls = _make_balls(cx, cy, config, 1)
                     particles = ParticleSystem()
                     floating_texts = FloatingTextSystem()
@@ -294,7 +295,8 @@ def main() -> None:
 
             # Pole okręgów — zwężanie, spawn i sprzątanie; ice spowalnia zwężanie
             ice_mult = 0.05 if powerup_system.ice_active else 1.0
-            field.update(dt, hp=state.get_ring_hp(), speed_multiplier=ice_mult)
+            field.update(dt, hp=state.get_ring_hp(), wave=state.wave,
+                         speed_multiplier=ice_mult)
 
             # Stos docisnął piłkę — kara i restart planszy
             if field.is_crushed():
@@ -304,7 +306,7 @@ def main() -> None:
                                            inner.radius, (220, 80, 60))
                 state.on_crushed()
                 config.apply_upgrades(state)
-                field.clear(hp=state.get_ring_hp())
+                field.clear(hp=state.get_ring_hp(), wave=state.wave)
                 balls = _make_balls(cx, cy, config, state.upgrade_multi_ball + 1)
                 floating_texts = FloatingTextSystem()
                 crush_pause = CRUSH_PAUSE
