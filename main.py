@@ -21,6 +21,7 @@ from ui.floating_text import FloatingTextSystem
 
 from constants import PANEL_W, FPS, BG_COLOR
 from save_manager import save_game, load_game, delete_save
+from timestep import FixedTimestep
 
 
 def update_dimensions(screen: pygame.Surface) -> tuple[int, int, int, int]:
@@ -162,11 +163,14 @@ def main() -> None:
             notifications.add("ICE! Okregi spowolnione!", (80, 180, 255))
 
     running = True
+    physics = FixedTimestep()
     while running:
-        dt = clock.tick(FPS) / 1000.0
-        dt = min(dt, 0.01)
+        # frame_dt — czas rzeczywisty klatki (liczniki UI, autozapis)
+        # dt       — stały krok fizyki (symulacja)
+        frame_dt = clock.tick(FPS) / 1000.0
+        dt = physics.step
 
-        autosave_timer += dt
+        autosave_timer += frame_dt
         if autosave_timer >= AUTOSAVE_INTERVAL:
             save_game(state)
             autosave_timer = 0.0
@@ -256,7 +260,10 @@ def main() -> None:
         # ----------------------------------------------------------------
         # Logika gry (zawsze w tle, niezależnie od aktywnej zakładki)
         # ----------------------------------------------------------------
-        if not game_won:
+        for _ in range(physics.steps(frame_dt)):
+            if game_won:
+                break
+
             # Aktualizuj power-upy
             powerup_system.update(dt, config, state, cx, cy)
 
@@ -362,10 +369,10 @@ def main() -> None:
             ring.draw(screen)
         particles.draw(screen)
         for ball in balls:
-            ball.draw(screen, dt)
+            ball.draw(screen, frame_dt)
 
         # Pływające napisy (obrażenia, monety)
-        floating_texts.update(dt)
+        floating_texts.update(frame_dt)
         floating_texts.draw(screen, font)
 
         # Power-upy na planszy + HUD aktywnych efektów
@@ -376,7 +383,7 @@ def main() -> None:
         game_view.draw_hud(screen, font, state, current_game_w, current_game_h)
 
         # Powiadomienia (nad obszarem gry)
-        notifications.update(dt)
+        notifications.update(frame_dt)
         notifications.draw(screen, font)
 
         # Separator między grą a panelem
