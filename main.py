@@ -172,9 +172,11 @@ def main() -> None:
 
         autosave_timer += frame_dt
         if autosave_timer >= AUTOSAVE_INTERVAL:
-            save_game(state)
             autosave_timer = 0.0
-            notifications.add("Gra zapisana.", color=(100, 200, 100), lifetime=1.5)
+            if save_game(state):
+                notifications.add("Gra zapisana.", color=(100, 200, 100), lifetime=1.5)
+            else:
+                notifications.add("Blad zapisu!", color=(220, 80, 80), lifetime=4.0)
 
         # ----------------------------------------------------------------
         # Zdarzenia
@@ -213,8 +215,10 @@ def main() -> None:
                     game_won = False
                     powerup_system = PowerUpSystem()
                 if event.key == pygame.K_F5:
-                    save_game(state)
-                    notifications.add("Zapisano!", color=(100, 200, 100), lifetime=1.5)
+                    if save_game(state):
+                        notifications.add("Zapisano!", color=(100, 200, 100), lifetime=1.5)
+                    else:
+                        notifications.add("Blad zapisu!", color=(220, 80, 80), lifetime=4.0)
                 if event.key == pygame.K_F6:
                     delete_save()
                     state = GameState()

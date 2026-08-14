@@ -169,4 +169,8 @@ poetry.toml
 
 # LSP config files
 pyrightconfig.json
+
+# Zapis gry i jego pliki poboczne
 save.json
+save.json.tmp
+save.json.corrupt
