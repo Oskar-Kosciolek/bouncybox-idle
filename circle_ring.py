@@ -2,22 +2,27 @@ import pygame
 import math
 import random
 from config import Config
+from ring_types import NORMAL, RingType
 
 
 class CircleRing:
-    def __init__(self, config: Config, window_size: tuple, hp: int = 100) -> None:
+    def __init__(self, config: Config, window_size: tuple, hp: int = 100,
+                 ring_type: RingType = NORMAL) -> None:
         self.config = config
+        self.type = ring_type
         self.cx = window_size[0] / 2
         self.cy = window_size[1] / 2
         self.radius: float = config.ring_start_radius
         self.alive = True
-        self.thickness = 4
-        self.max_hp: int = hp
-        self.hp: int = hp
-        self.base_color = (60, 120, 200)
+        self.thickness = ring_type.thickness
+        self.max_hp: int = max(1, int(hp * ring_type.hp_multiplier))
+        self.hp: int = self.max_hp
+        self.base_color = ring_type.color
         self.color = self.base_color   # zmienia się z HP
         self.exploded = False  # flaga — cząsteczki emitowane tylko raz
         self.gold_multiplier: float = 1.0
+        # Czy podział po śmierci został już rozliczony przez RingField
+        self.split_resolved: bool = False
 
         # Fade out po zniszczeniu
         self.alpha: float = 255.0
@@ -46,13 +51,15 @@ class CircleRing:
         self.alive = False
 
     def _update_color(self) -> None:
-        """Kolor zmienia się od bazowego (niebieski) do czerwonego w miarę tracenia HP.
-        Pełne HP = (60, 120, 200), martwe = (220, 60, 60)."""
+        """Kolor przechodzi od barwy typu (pełne HP) do czerwieni (martwy)."""
         ratio = self.hp / self.max_hp  # 1.0 = pełne HP, 0.0 = martwe
-        r = int(60 + (220 - 60) * (1.0 - ratio))
-        g = int(120 * ratio)
-        b = int(200 * ratio)
-        self.color = (r, g, b)
+        r0, g0, b0 = self.base_color
+        dead = (220, 60, 60)
+        self.color = (
+            int(r0 + (dead[0] - r0) * (1.0 - ratio)),
+            int(g0 + (dead[1] - g0) * (1.0 - ratio)),
+            int(b0 + (dead[2] - b0) * (1.0 - ratio)),
+        )
 
     def update(self, dt: float, speed_multiplier: float = 1.0) -> None:
         if not self.alive:
@@ -64,7 +71,8 @@ class CircleRing:
                           for h in self.holes]
 
         # Zmniejszanie — współczynnik prędkości (np. 0.05 gdy ice aktywny)
-        self.radius -= self.config.ring_shrink_speed * speed_multiplier * dt
+        self.radius -= (self.config.ring_shrink_speed * speed_multiplier
+                        * self.type.shrink_multiplier * dt)
 
     def is_point_in_hole(self, angle_deg: float) -> bool:
         """Sprawdź czy kąt mieści się w którejś dziurze."""
