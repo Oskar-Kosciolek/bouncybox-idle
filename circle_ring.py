@@ -76,6 +76,38 @@ class CircleRing:
                 return True
         return False
 
+    def _swept_crossing(self, ball) -> float | None:
+        """Ułamek odcinka ruchu piłki, na którym przecina ona linię okręgu.
+
+        Test pozycyjny pyta tylko „gdzie piłka jest teraz" — piłce, która w
+        jednym kroku przeskoczyła z jednej strony okręgu na drugą, wymyka się
+        całkowicie. Tutaj rozwiązujemy |P0 + t*(P1-P0) - C|² = R² względem t
+        i zwracamy najmniejsze t w [0, 1], czyli moment pierwszego kontaktu.
+        Zwraca None, gdy odcinek w ogóle nie dosięga linii okręgu.
+        """
+        px = ball.prev_x - self.cx
+        py = ball.prev_y - self.cy
+        dx = ball.x - ball.prev_x
+        dy = ball.y - ball.prev_y
+
+        a = dx * dx + dy * dy
+        if a < 1e-12:            # piłka stoi w miejscu
+            return None
+
+        b = 2.0 * (px * dx + py * dy)
+        c = px * px + py * py - self.radius * self.radius
+        delta = b * b - 4.0 * a * c
+        if delta < 0.0:          # odcinek mija okrąg
+            return None
+
+        root = math.sqrt(delta)
+        # a > 0, więc pierwszy pierwiastek jest zawsze mniejszy
+        for t in ((-b - root) / (2.0 * a),
+                  (-b + root) / (2.0 * a)):
+            if 0.0 <= t <= 1.0:
+                return t
+        return None
+
     def check_collision(self, ball) -> bool:
         """
         Sprawdza kolizję piłki z okręgiem.
@@ -89,11 +121,23 @@ class CircleRing:
         dx = ball.x - self.cx
         dy = ball.y - self.cy
         dist = math.sqrt(dx * dx + dy * dy)
-        if dist < 0.001:
-            return False
 
         # Kolizja gdy piłka dotyka powierzchni okręgu od wewnątrz lub zewnątrz
+        swept = False
         if abs(dist - self.radius) > ball.radius + self.thickness:
+            # Piłka nie dotyka okręgu teraz, ale mogła go przeskoczyć w trakcie kroku
+            t = self._swept_crossing(ball)
+            if t is None:
+                return False
+            # Cofnij piłkę do miejsca, w którym naprawdę dotknęła okręgu
+            swept = True
+            ball.x = ball.prev_x + (ball.x - ball.prev_x) * t
+            ball.y = ball.prev_y + (ball.y - ball.prev_y) * t
+            dx = ball.x - self.cx
+            dy = ball.y - self.cy
+            dist = math.sqrt(dx * dx + dy * dy)
+
+        if dist < 0.001:
             return False
 
         angle = math.degrees(math.atan2(dy, dx)) % 360
@@ -110,8 +154,17 @@ class CircleRing:
         nx = dx / dist
         ny = dy / dist
 
+        # Z której strony nadleciała piłka. Po cofnięciu do punktu styku
+        # dist == radius, więc dla trafień swept stronę zna tylko poprzednia pozycja.
+        if swept:
+            prev_dist = math.sqrt((ball.prev_x - self.cx) ** 2
+                                  + (ball.prev_y - self.cy) ** 2)
+            from_inside = prev_dist < self.radius
+        else:
+            from_inside = dist < self.radius
+
         # Piłka wewnątrz okręgu — wypchnij do środka (zmniejsz dist do radius - ball.radius - 1)
-        if dist < self.radius:
+        if from_inside:
             ball.x = self.cx + nx * (self.radius - ball.radius - self.thickness - 1)
             ball.y = self.cy + ny * (self.radius - ball.radius - self.thickness - 1)
             # Odbij do środka: normalna wskazuje do środka = -nx, -ny

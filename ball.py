@@ -9,6 +9,10 @@ class Ball:
         self.config = config
         self.x = x
         self.y = y
+        # Pozycja sprzed ostatniego kroku — odcinek (prev -> teraz) jest tym,
+        # co okrąg testuje na przecięcie ze swoją linią.
+        self.prev_x = x
+        self.prev_y = y
         self.vx = config.initial_speed_x
         self.vy = config.initial_speed_y
         self.radius = config.ball_radius
@@ -32,6 +36,8 @@ class Ball:
         self._trail.append((self.x, self.y))
         if len(self._trail) > 20:
             self._trail.pop(0)
+        self.prev_x = self.x
+        self.prev_y = self.y
         self.x += self.vx * dt
         self.y += self.vy * dt
 
@@ -54,6 +60,8 @@ class Ball:
     def reset(self, x: float, y: float) -> None:
         self.x = x
         self.y = y
+        self.prev_x = x
+        self.prev_y = y
         self.vx = self.config.initial_speed_x
         self.vy = self.config.initial_speed_y
         self.collision_cooldown = 0.0
