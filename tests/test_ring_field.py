@@ -338,3 +338,53 @@ def test_split_also_fires_for_rings_killed_outside_the_collision_loop():
     field.update(1 / 240, hp=100, wave=6)
 
     assert len(field.alive()) == 2
+
+
+def test_boss_appears_on_every_tenth_wave():
+    import random
+
+    config = Config()
+    field = RingField(config, (400, 400), hp=100, wave=10,
+                      rng=random.Random(3))
+
+    assert field.rings[0].type.id == "boss"
+
+
+def test_no_boss_on_ordinary_waves():
+    import random
+
+    config = Config()
+    field = RingField(config, (400, 400), hp=100, wave=9,
+                      rng=random.Random(3))
+
+    assert field.rings[0].type.id != "boss"
+
+
+def test_only_one_boss_per_visit_to_a_boss_wave():
+    import random
+
+    config = Config()
+    config.ring_spawn_interval = 0.1
+    config.ring_shrink_speed = 60.0
+    field = RingField(config, (400, 400), hp=100, wave=10,
+                      rng=random.Random(3))
+
+    for _ in range(2000):
+        field.update(1 / 240, hp=100, wave=10)
+
+    assert sum(1 for r in field.rings if r.type.id == "boss") == 1
+
+
+def test_boss_returns_after_losing_and_regaining_the_wave():
+    """Zduszenie przez bossa cofa gracza na falę 9. Po powrocie na 10 boss
+    musi czekać ponownie — inaczej gracz mijałby go bez walki na zawsze."""
+    import random
+
+    config = Config()
+    field = RingField(config, (400, 400), hp=100, wave=10,
+                      rng=random.Random(3))
+
+    field.clear(hp=100, wave=9)     # kara za zduszenie
+    field.clear(hp=100, wave=10)    # gracz odbudował falę
+
+    assert field.rings[0].type.id == "boss"

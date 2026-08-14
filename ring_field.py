@@ -2,7 +2,7 @@ import random
 
 from circle_ring import CircleRing
 from config import Config
-from ring_types import NORMAL, pick_type
+from ring_types import BOSS, BOSS_EVERY, NORMAL, RingType, pick_type
 
 # Minimalny odstęp promieni między sąsiednimi okręgami. Nie jest wymuszany
 # na promieniach po fakcie — wynika z tego, kiedy wolno postawić nowy okrąg.
@@ -25,12 +25,32 @@ class RingField:
         self.spawn_timer: float = 0.0
         self._size = size
         self._rng = rng if rng is not None else random.Random()
+        self._last_wave: int = wave
+        self._boss_done_for_wave: int | None = None
         self.spawn(hp, wave)
+
+    def _next_type(self, wave: int) -> RingType:
+        """Wybiera typ kolejnego okręgu — boss deterministycznie, reszta losowo.
+
+        Znacznik bossa kasuje się przy każdej zmianie fali, w obie strony.
+        Bez tego powstaje pułapka: boss dusi piłkę na fali 10, kara cofa gracza
+        na 9, gracz odbudowuje 10 — a znacznik wciąż twierdzi, że boss dla fali
+        10 już był, więc gracz mijałby go bez walki na zawsze.
+        """
+        if wave != self._last_wave:
+            self._last_wave = wave
+            self._boss_done_for_wave = None
+
+        if wave % BOSS_EVERY == 0 and self._boss_done_for_wave != wave:
+            self._boss_done_for_wave = wave
+            return BOSS
+
+        return pick_type(wave, self._rng)
 
     def spawn(self, hp: int, wave: int) -> CircleRing:
         """Stawia nowy okrąg na zewnętrznej krawędzi pola."""
         ring = CircleRing(self.config, self._size, hp=hp,
-                          ring_type=pick_type(wave, self._rng))
+                          ring_type=self._next_type(wave))
         self.rings.append(ring)
         return ring
 
