@@ -32,7 +32,8 @@ class Config:
     ring_spawn_interval: float = 3.0   # sekundy między nowymi okręgami
     ring_shrink_speed: float = 1.0    # px/s — prędkość zmniejszania się
     ring_start_radius: float = 220.0   # promień startowy
-    ring_min_radius: float = 100.0      # minimalna wielkość
+    ring_min_radius: float = 30.0      # minimalna wielkość
+    ring_max_active: int = 5           # ile okręgów naraz na planszy
 
     # Dziury
     hole_count: int = 0                # liczba dziur na okręgu (1-4)

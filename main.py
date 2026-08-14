@@ -2,7 +2,7 @@ import random
 import pygame
 
 from ball import Ball
-from circle_ring import CircleRing
+from ring_field import RingField
 from particles import ParticleSystem
 from config import Config
 from game_state import GameState
@@ -97,7 +97,7 @@ def main() -> None:
     old_cx, old_cy = cx, cy
 
     particles = ParticleSystem()
-    rings: list[CircleRing] = [CircleRing(config, (current_game_w, current_game_h), hp=state.get_ring_hp())]
+    field = RingField(config, (current_game_w, current_game_h), hp=state.get_ring_hp())
     balls: list[Ball] = _make_balls(cx, cy, config, 1)
     floating_texts = FloatingTextSystem()
     game_won: bool = False
@@ -116,10 +116,10 @@ def main() -> None:
 
     def do_prestige() -> None:
         """Callback wywoływany po kliknięciu przycisku PRESTIGE."""
-        nonlocal rings, balls, particles, game_won, floating_texts
+        nonlocal balls, particles, game_won, floating_texts
         if state.prestige():
             config.apply_upgrades(state)
-            rings = [CircleRing(config, (current_game_w, current_game_h), hp=state.get_ring_hp())]
+            field.clear(hp=state.get_ring_hp())
             # Piłka startowa + dodatkowe z ulepszenia prestige_extra_ball
             balls = [Ball(cx, cy, config)]
             for i in range(state.prestige_extra_ball):
@@ -135,20 +135,21 @@ def main() -> None:
 
     def _apply_powerup_to_game(kind: str) -> None:
         """Stosuje natychmiastowy efekt power-upa na grę."""
-        nonlocal rings, balls
+        nonlocal balls
 
         if kind == "gold":
-            # Oznacz aktywny okrąg jako złoty — x7 monet przy zniszczeniu
-            alive = [r for r in rings if r.alive]
-            if alive:
-                alive[-1].gold_multiplier = 7.0
+            # Oznacz aktywny okrąg jako złoty — x7 monet przy zniszczeniu.
+            # Aktywny = najbardziej wewnętrzny, bo tylko w ten piłka trafia.
+            active = field.innermost()
+            if active is not None:
+                active.gold_multiplier = 7.0
                 notifications.add("ZLOTY x7! Zniszcz aktywny okrag!", (255, 200, 40))
 
         elif kind == "bomb":
-            # Zniszcz drugi okrąg od końca (obok aktywnego)
-            alive = [r for r in rings if r.alive]
+            # Zniszcz okrąg tuż za aktywnym — skraca kolejkę czekających warstw
+            alive = field.alive()
             if len(alive) >= 2:
-                target = alive[-2]
+                target = alive[1]
                 target.destroy()
                 gold_mult = getattr(target, "gold_multiplier", 1.0)
                 coins = state.on_ring_destroyed(gold_multiplier=gold_mult)
@@ -190,9 +191,7 @@ def main() -> None:
                 current_game_w, current_game_h, cx, cy = update_dimensions(screen)
                 
                 # Przenieś okręgi i powerupy do nowego środka
-                for ring in rings:
-                    ring.cx = cx
-                    ring.cy = cy
+                field.recenter((current_game_w, current_game_h))
 
                 for ball in balls:
                     ball.x = ball.x + cx - old_cx
@@ -207,7 +206,7 @@ def main() -> None:
                 if event.key == pygame.K_r:
                     # Nowa runda — zachowuje monety, ulepszenia i falę
                     config.apply_upgrades(state)
-                    rings = [CircleRing(config, (current_game_w, current_game_h), hp=state.get_ring_hp())]
+                    field.clear(hp=state.get_ring_hp())
                     balls = _make_balls(cx, cy, config,
                                        state.upgrade_multi_ball + 1)
                     particles = ParticleSystem()
@@ -223,7 +222,7 @@ def main() -> None:
                     delete_save()
                     state = GameState()
                     config.apply_upgrades(state)
-                    rings = [CircleRing(config, (current_game_w, current_game_h), hp=state.get_ring_hp())]
+                    field.clear(hp=state.get_ring_hp())
                     balls = _make_balls(cx, cy, config, 1)
                     particles = ParticleSystem()
                     floating_texts = FloatingTextSystem()
@@ -282,27 +281,13 @@ def main() -> None:
                     game_won = True
                     break
 
-            # Spawn nowego okręgu gdy lista jest pusta
-            if not rings:
-                hp = state.get_ring_hp()
-                rings.append(CircleRing(config, (current_game_w, current_game_h), hp=hp))
-
-            # Aktualizuj okręgi — ice spowalnia zmniejszanie
+            # Pole okręgów — zwężanie, spawn i sprzątanie; ice spowalnia zwężanie
             ice_mult = 0.05 if powerup_system.ice_active else 1.0
-            for ring in rings:
-                ring.update(dt, speed_multiplier=ice_mult)
+            field.update(dt, hp=state.get_ring_hp(), speed_multiplier=ice_mult)
 
-            # Minimalny odstęp między okręgami (zapobiega nakładaniu)
-            alive_rings = sorted([r for r in rings if r.alive], key=lambda r: r.radius)
-            min_r = max((b.radius for b in balls), default=8) * 3
-            for ring in alive_rings:
-                if ring.radius < min_r:
-                    ring.radius = min_r
-                min_r = ring.radius + 35
-
-            # Kolizje piłka ↔ okrąg
+            # Kolizje piłka ↔ okrąg, od najbardziej wewnętrznego
             for ball in balls:
-                for ring in reversed(rings):
+                for ring in field.alive():
                     if ring.alive:
                         was_alive = ring.alive
                         collided = ring.check_collision(ball)
@@ -355,8 +340,6 @@ def main() -> None:
                     powerup_system.apply_effect(kind)
                     _apply_powerup_to_game(kind)
 
-            # Usuń całkowicie przezroczyste okręgi
-            rings = [r for r in rings if not r.is_faded()]
             particles.update(dt)
 
             # Auto-kolektor — pasywne monety co sekundę
@@ -369,7 +352,7 @@ def main() -> None:
         screen.fill(BG_COLOR)
 
         # Obszar gry
-        for ring in rings:
+        for ring in field.rings:
             ring.draw(screen)
         particles.draw(screen)
         for ball in balls:

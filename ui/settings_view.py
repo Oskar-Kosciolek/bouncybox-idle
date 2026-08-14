@@ -20,6 +20,7 @@ _SLIDERS: list[tuple[str, str, float, float, bool]] = [
     ("Predkosc zwezania",       "ring_shrink_speed",      5.0, 100.0, True),
     ("Promien startowy",        "ring_start_radius",    100.0, 230.0, True),
     ("Min promien",             "ring_min_radius",       20.0, 100.0, True),
+    ("Max okregow",             "ring_max_active",        1.0,  10.0, False),
     ("Czas power-upa (s)",      "powerup_duration",       3.0,  20.0, True),
     ("Max power-upow",          "powerup_max_visible",    1.0,   5.0, False),
     ("Promien spawnu PU",       "powerup_spawn_radius",  50.0, 240.0, True),
