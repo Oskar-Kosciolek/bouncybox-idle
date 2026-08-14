@@ -54,3 +54,31 @@ def test_crush_leaves_prestige_progress_untouched():
 
     assert state.prestige_count == 2
     assert state.prestige_crystals == 7
+
+
+def test_ring_payout_scales_with_type_multiplier():
+    plain = GameState(wave=1)
+    fancy = GameState(wave=1)
+
+    base = plain.on_ring_destroyed()
+    boosted = fancy.on_ring_destroyed(type_multiplier=2.5)
+
+    assert boosted == base * 2.5
+
+
+def test_gold_and_type_multipliers_stack():
+    """Złoty power-up na pancernym ma dać 7 x 2.5, nie jedno z dwóch."""
+    plain = GameState(wave=1)
+    both = GameState(wave=1)
+
+    base = plain.on_ring_destroyed()
+    combined = both.on_ring_destroyed(gold_multiplier=7.0, type_multiplier=2.5)
+
+    assert combined == base * 7.0 * 2.5
+
+
+def test_type_multiplier_defaults_to_neutral():
+    without = GameState(wave=3).on_ring_destroyed()
+    explicit = GameState(wave=3).on_ring_destroyed(type_multiplier=1.0)
+
+    assert without == explicit

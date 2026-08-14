@@ -159,7 +159,9 @@ def main() -> None:
                 target = alive[1]
                 target.destroy()
                 gold_mult = getattr(target, "gold_multiplier", 1.0)
-                coins = state.on_ring_destroyed(gold_multiplier=gold_mult)
+                coins = state.on_ring_destroyed(
+                    gold_multiplier=gold_mult,
+                    type_multiplier=target.type.coin_multiplier)
                 particles.explode_ring(target.cx, target.cy,
                                        target.radius, target.color)
                 notifications.add(f"BOMBA! +{coins:.0f} monet", (220, 80, 60))
@@ -323,7 +325,9 @@ def main() -> None:
                         if was_alive and not ring.alive:
                             # Okrąg zniszczony — ustal przyczynę
                             gold_mult = getattr(ring, "gold_multiplier", 1.0)
-                            coins = state.on_ring_destroyed(gold_multiplier=gold_mult)
+                            coins = state.on_ring_destroyed(
+                                gold_multiplier=gold_mult,
+                                type_multiplier=ring.type.coin_multiplier)
                             particles.explode_ring(ring.cx, ring.cy,
                                                    ring.radius, ring.color)
                             if not collided:
