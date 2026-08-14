@@ -386,7 +386,7 @@ def main() -> None:
 
         # Obszar gry
         for ring in field.rings:
-            ring.draw(screen)
+            ring.draw(screen, font)
         particles.draw(screen)
         for ball in balls:
             ball.draw(screen, frame_dt)

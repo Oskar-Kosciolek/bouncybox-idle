@@ -192,7 +192,8 @@ class CircleRing:
         """Zwraca True gdy okrąg jest martwy i całkowicie przezroczysty."""
         return not self.alive and self.alpha <= 0
 
-    def draw(self, surface: pygame.Surface) -> None:
+    def draw(self, surface: pygame.Surface,
+             font: pygame.font.Font | None = None) -> None:
         if self.alpha <= 0:
             return
 
@@ -223,3 +224,11 @@ class CircleRing:
             fill_w = max(0, int(bar_w * self.hp / self.max_hp))
             if fill_w > 0:
                 pygame.draw.rect(surface, self.color, (bx, by, fill_w, bar_h))
+
+        # Etykieta typu pod paskiem HP — przy pięciu typach sam kolor
+        # byłby zagadką. Zwykły okrąg ma pustą nazwę i nie dostaje etykiety.
+        if self.alive and font is not None and self.type.name:
+            label = font.render(self.type.name, True, self.base_color)
+            surface.blit(label, label.get_rect(
+                centerx=int(self.cx),
+                top=int(self.cy + self.radius + 16)))
