@@ -1,5 +1,14 @@
 from dataclasses import dataclass
 
+# Wartości bazowe pól POCHODNYCH — tych, które wylicza apply_upgrades.
+# apply_upgrades startuje od nich za każdym razem, dzięki czemu jest
+# idempotentne: wielokrotne wywołanie daje ten sam wynik.
+BASE_BALL_RADIUS: int = 5
+BASE_HOLE_SIZE: float = 0.0
+BASE_HOLE_COUNT: int = 0
+BASE_HOLE_MOVE_SPEED: float = 10.0
+BASE_RING_SHRINK_SPEED: float = 1.0
+
 
 @dataclass
 class Config:
@@ -47,7 +56,13 @@ class Config:
     powerup_chance_mystery: float = 0.15
 
     def apply_upgrades(self, state) -> None:
-        """Aktualizuje pola config na podstawie aktualnych poziomów ulepszeń i prestige."""
+        """Przelicza pola pochodne na podstawie poziomów ulepszeń, prestige i fali.
+
+        Idempotentne — każde pole liczone jest od wartości BASE_*, nigdy od
+        własnej poprzedniej wartości. Metoda jest wołana przy każdym zakupie,
+        awansie fali, prestige i wczytaniu zapisu, więc kumulowanie zamieniało
+        balans w potęgę (fala 10 → shrink 178 px/s, dziura 600°).
+        """
         # Prestige bonusy (permanentne)
         prestige_speed_bonus = 1.0 + state.prestige_speed * 0.10
         prestige_hole_bonus = state.prestige_hole_size * 8.0
@@ -56,12 +71,14 @@ class Config:
         speed = base_speed * (1.0 + state.upgrade_ball_speed * 0.2)
         self.initial_speed_x = speed
         self.initial_speed_y = -speed
-        self.ball_radius = self.ball_radius + state.upgrade_ball_size * 2
-        self.hole_size = self.hole_size + state.upgrade_hole_size * 10.0 + prestige_hole_bonus
-        self.hole_count = self.hole_count + state.upgrade_hole_count
+        self.ball_radius = BASE_BALL_RADIUS + state.upgrade_ball_size * 2
+        self.hole_size = (BASE_HOLE_SIZE + state.upgrade_hole_size * 10.0
+                          + prestige_hole_bonus)
+        self.hole_count = BASE_HOLE_COUNT + state.upgrade_hole_count
         self.hole_moving = state.upgrade_hole_speed > 0
-        self.hole_move_speed = self.hole_move_speed + state.upgrade_hole_speed * 25.0
+        self.hole_move_speed = (BASE_HOLE_MOVE_SPEED
+                                + state.upgrade_hole_speed * 25.0)
         self.ball_trail_enabled = state.upgrade_ball_trail > 0
         # Trudność rośnie z falą
-        self.ring_shrink_speed = self.ring_shrink_speed + state.wave * 3.0
+        self.ring_shrink_speed = BASE_RING_SHRINK_SPEED + state.wave * 3.0
         self.ring_spawn_interval = max(1.0, 4.0 - state.wave * 0.2)
