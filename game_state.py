@@ -122,6 +122,17 @@ class GameState:
         if self.upgrade_coins_on_bounce > 0:
             self.add_coins(self.upgrade_coins_on_bounce * 0.5)
 
+    def on_crushed(self) -> None:
+        """Wywołaj gdy stos okręgów dociśnie piłkę.
+
+        Kara cofa trudność, a nie dorobek: fala spada o jeden, postęp w fali
+        przepada, ale monety, ulepszenia, prestige i osiągnięcia zostają.
+        Dzięki temu porażka spowalnia grę, zamiast ją zatrzymywać.
+        """
+        self.wave = max(1, self.wave - 1)
+        self.rings_destroyed_this_wave = 0
+        self.rings_to_next_wave = 5 + self.wave * 2
+
     def get_ring_hp(self) -> int:
         """Startowe HP okręgu = 100, rośnie o 15 za każdą falę."""
         return 100 + (self.wave - 1) * 15

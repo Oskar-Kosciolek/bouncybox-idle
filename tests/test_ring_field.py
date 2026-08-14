@@ -118,6 +118,35 @@ def test_no_ring_shrinks_below_minimum_radius():
     assert all(ring.radius >= 30.0 for ring in field.alive())
 
 
+def test_fresh_field_is_not_crushed():
+    _, field = _field()
+
+    assert field.is_crushed() is False
+
+
+def test_field_reports_crush_when_innermost_reaches_minimum():
+    """Okrąg dociśnięty do minimum nie zostawia piłce miejsca na grę."""
+    config, field = _field()
+    config.ring_min_radius = 30.0
+    config.ring_shrink_speed = 1000.0
+
+    field.update(1.0, hp=100)
+
+    assert field.is_crushed() is True
+
+
+def test_cleared_field_is_not_crushed():
+    """Po karze gra rusza dalej — świeże pole nie może od razu zgłaszać zduszenia."""
+    config, field = _field()
+    config.ring_min_radius = 30.0
+    config.ring_shrink_speed = 1000.0
+    field.update(1.0, hp=100)
+
+    field.clear(hp=100)
+
+    assert field.is_crushed() is False
+
+
 def test_clear_leaves_one_fresh_ring_with_given_hp():
     config, field = _field()
     config.ring_shrink_speed = RING_GAP + 5.0

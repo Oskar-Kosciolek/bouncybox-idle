@@ -86,8 +86,10 @@ def main() -> None:
     pygame.display.set_caption("bouncybox idle")
     clock = pygame.time.Clock()
 
-    # Czcionka podstawowa UI
+    # Czcionki — tworzone raz, SysFont jest kosztowny na klatkę
     font = pygame.font.SysFont("segoeui", 13)
+    win_font = pygame.font.SysFont("segoeui", 52, bold=True)
+    crush_font = pygame.font.SysFont("segoeui", 40, bold=True)
 
     config = Config()
     state = load_game() or GameState()
@@ -101,6 +103,10 @@ def main() -> None:
     balls: list[Ball] = _make_balls(cx, cy, config, 1)
     floating_texts = FloatingTextSystem()
     game_won: bool = False
+    # Krótka przerwa po zduszeniu — gracz ma zobaczyć, co się stało,
+    # zanim gra ruszy dalej sama.
+    CRUSH_PAUSE = 2.0
+    crush_pause: float = 0.0
 
     tab_bar = TabBar(PANEL_W)
     shop_view = ShopView(state, UPGRADES)
@@ -263,8 +269,13 @@ def main() -> None:
         # ----------------------------------------------------------------
         # Logika gry (zawsze w tle, niezależnie od aktywnej zakładki)
         # ----------------------------------------------------------------
+        if crush_pause > 0.0:
+            crush_pause = max(0.0, crush_pause - frame_dt)
+
+        # steps() wołamy zawsze, żeby opróżnić akumulator — inaczej po
+        # przerwie gra nadrabiałaby zaległość z pauzy.
         for _ in range(physics.steps(frame_dt)):
-            if game_won:
+            if game_won or crush_pause > 0.0:
                 break
 
             # Aktualizuj power-upy
@@ -284,6 +295,22 @@ def main() -> None:
             # Pole okręgów — zwężanie, spawn i sprzątanie; ice spowalnia zwężanie
             ice_mult = 0.05 if powerup_system.ice_active else 1.0
             field.update(dt, hp=state.get_ring_hp(), speed_multiplier=ice_mult)
+
+            # Stos docisnął piłkę — kara i restart planszy
+            if field.is_crushed():
+                inner = field.innermost()
+                if inner is not None:
+                    particles.explode_ring(inner.cx, inner.cy,
+                                           inner.radius, (220, 80, 60))
+                state.on_crushed()
+                config.apply_upgrades(state)
+                field.clear(hp=state.get_ring_hp())
+                balls = _make_balls(cx, cy, config, state.upgrade_multi_ball + 1)
+                floating_texts = FloatingTextSystem()
+                crush_pause = CRUSH_PAUSE
+                notifications.add(f"ZDUSZONY! Spadek na fale {state.wave}",
+                                  color=(220, 80, 60), lifetime=3.0)
+                break
 
             # Kolizje piłka ↔ okrąg, od najbardziej wewnętrznego
             for ball in balls:
@@ -392,9 +419,16 @@ def main() -> None:
             settings_view.draw(screen, font, config, current_game_w, current_game_h)
         # Zakładka 0 (Gra) — tylko HUD, nic dodatkowego w panelu
 
+        # Nakładka po zduszeniu — gra wraca sama, bez udziału gracza
+        if crush_pause > 0.0 and not game_won:
+            txt = crush_font.render("ZDUSZONY", True, (220, 80, 60))
+            screen.blit(txt, txt.get_rect(center=(cx, cy)))
+            sub = font.render(f"Fala {state.wave} — gra wraca za "
+                              f"{crush_pause:.0f} s", True, (180, 150, 150))
+            screen.blit(sub, sub.get_rect(center=(cx, cy + 40)))
+
         # Ekran wygranej
         if game_won:
-            win_font = pygame.font.SysFont("segoeui", 52, bold=True)
             txt = win_font.render("Win!", True, (255, 220, 80))
             screen.blit(txt, txt.get_rect(center=(cx, cy)))
             sub = font.render("R \u2014 zagraj ponownie", True, (180, 180, 200))

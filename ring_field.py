@@ -37,6 +37,11 @@ class RingField:
         alive = self.alive()
         return alive[0] if alive else None
 
+    def is_crushed(self) -> bool:
+        """Czy stos dociśnięto do minimum — piłka nie ma już gdzie grać."""
+        inner = self.innermost()
+        return inner is not None and inner.radius <= self.config.ring_min_radius
+
     def has_room(self) -> bool:
         """Czy jest miejsce na kolejny okrąg.
 
