@@ -15,9 +15,14 @@ _COL_BAR_FG  = (80, 140, 220)
 _COL_BORDER  = (40,  40,  55)
 
 # (etykieta, pole w Config, min, max, czy_float)
+# Uwaga: ring_shrink_speed i ring_spawn_interval są POCHODNE — apply_upgrades
+# przelicza je przy każdym zakupie i awansie fali, więc suwak na nich nic nie
+# trzymał. Sterujemy tu ich wejściami.
 _SLIDERS: list[tuple[str, str, float, float, bool]] = [
-    ("Spawn okregów (s)",       "ring_spawn_interval",    0.5,  10.0, True),
-    ("Predkosc zwezania",       "ring_shrink_speed",      5.0, 100.0, True),
+    ("Karencja zduszenia (s)",  "crush_grace",            0.0,  20.0, True),
+    ("Zwezanie na fale",        "shrink_per_wave",        0.0,  10.0, True),
+    ("Sufit zwezania",          "max_shrink_speed",       5.0, 100.0, True),
+    ("Min odstep spawnu (s)",   "min_spawn_interval",     0.2,   5.0, True),
     ("Promien startowy",        "ring_start_radius",    100.0, 230.0, True),
     ("Min promien",             "ring_min_radius",       20.0, 100.0, True),
     ("Max okregow",             "ring_max_active",        1.0,  10.0, False),

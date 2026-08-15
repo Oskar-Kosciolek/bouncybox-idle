@@ -129,3 +129,61 @@ def test_shrink_speed_still_grows_on_early_waves():
     later.apply_upgrades(GameState(wave=6))
 
     assert later.ring_shrink_speed > early.ring_shrink_speed
+
+
+def test_shrink_growth_per_wave_is_tunable():
+    """Suwak ma sterować wejściem, a nie wynikiem. ring_shrink_speed jest polem
+    pochodnym — apply_upgrades nadpisze każdą wartość wpisaną w nie wprost."""
+    config = Config()
+    config.shrink_per_wave = 1.0
+
+    config.apply_upgrades(GameState(wave=5))
+
+    assert config.ring_shrink_speed == 1.0 + 5 * 1.0
+
+
+def test_shrink_ceiling_is_tunable():
+    config = Config()
+    config.max_shrink_speed = 10.0
+
+    config.apply_upgrades(GameState(wave=100))
+
+    assert config.ring_shrink_speed == 10.0
+
+
+def test_spawn_interval_floor_is_tunable():
+    config = Config()
+    config.min_spawn_interval = 0.5
+
+    config.apply_upgrades(GameState(wave=100))
+
+    assert config.ring_spawn_interval == 0.5
+
+
+def test_every_settings_slider_points_at_a_real_config_field():
+    """Literówka w nazwie pola dałaby suwak, który cicho nic nie robi."""
+    from ui.settings_view import _SLIDERS
+
+    config = Config()
+    missing = [field for _, field, *_ in _SLIDERS if not hasattr(config, field)]
+
+    assert missing == []
+
+
+def test_no_settings_slider_targets_a_derived_field():
+    """Pola przeliczanego przez apply_upgrades nie da się ustawić suwakiem —
+    wartość zniknie przy najbliższym zakupie albo awansie fali. Suwaki muszą
+    celować w wejścia, nie w wyniki."""
+    from ui.settings_view import _SLIDERS
+
+    fresh = Config()
+    recomputed = Config()
+    recomputed.apply_upgrades(GameState(
+        wave=3, upgrade_hole_size=1, upgrade_hole_count=1,
+        upgrade_ball_size=1, upgrade_hole_speed=1, upgrade_ball_trail=1))
+
+    derived = {name for name in vars(fresh)
+               if getattr(fresh, name) != getattr(recomputed, name)}
+    targeted = {field for _, field, *_ in _SLIDERS}
+
+    assert targeted & derived == set()

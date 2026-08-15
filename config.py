@@ -63,6 +63,14 @@ class Config:
     # musi sięgnąć po ulepszenia dziur.
     crush_grace: float = 6.0
 
+    # Wejścia dla pól pochodnych. Suwaki w panelu Ustawienia sterują właśnie
+    # nimi, a nie ring_shrink_speed czy ring_spawn_interval — te dwa są
+    # przeliczane przy każdym zakupie i awansie fali, więc wartość wpisana
+    # w nie wprost znikała przy najbliższej okazji.
+    shrink_per_wave: float = 3.0
+    max_shrink_speed: float = MAX_RING_SHRINK_SPEED
+    min_spawn_interval: float = 1.0
+
     # Dziury
     hole_count: int = 0                # liczba dziur na okręgu (1-4)
     hole_size: float = 0.0             # rozmiar dziury w stopniach (małe — złoty strzał)
@@ -112,6 +120,8 @@ class Config:
                                 + state.upgrade_hole_speed * 25.0)
         self.ball_trail_enabled = state.upgrade_ball_trail > 0
         # Trudność rośnie z falą, ale zwężanie ma sufit
-        self.ring_shrink_speed = min(BASE_RING_SHRINK_SPEED + state.wave * 3.0,
-                                     MAX_RING_SHRINK_SPEED)
-        self.ring_spawn_interval = max(1.0, 4.0 - state.wave * 0.2)
+        self.ring_shrink_speed = min(
+            BASE_RING_SHRINK_SPEED + state.wave * self.shrink_per_wave,
+            self.max_shrink_speed)
+        self.ring_spawn_interval = max(self.min_spawn_interval,
+                                       4.0 - state.wave * 0.2)

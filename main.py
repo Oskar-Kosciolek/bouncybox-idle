@@ -88,7 +88,6 @@ def main() -> None:
 
     # Czcionki — tworzone raz, SysFont jest kosztowny na klatkę
     font = pygame.font.SysFont("segoeui", 13)
-    win_font = pygame.font.SysFont("segoeui", 52, bold=True)
     crush_font = pygame.font.SysFont("segoeui", 40, bold=True)
 
     config = Config()
@@ -103,7 +102,6 @@ def main() -> None:
                       hp=state.get_ring_hp(), wave=state.wave)
     balls: list[Ball] = _make_balls(cx, cy, config, 1)
     floating_texts = FloatingTextSystem()
-    game_won: bool = False
     # Krótka przerwa po zduszeniu — gracz ma zobaczyć, co się stało,
     # zanim gra ruszy dalej sama.
     CRUSH_PAUSE = 2.0
@@ -123,7 +121,7 @@ def main() -> None:
 
     def do_prestige() -> None:
         """Callback wywoływany po kliknięciu przycisku PRESTIGE."""
-        nonlocal balls, particles, game_won, floating_texts
+        nonlocal balls, particles, floating_texts
         if state.prestige():
             config.apply_upgrades(state)
             field.clear(hp=state.get_ring_hp(), wave=state.wave)
@@ -133,7 +131,6 @@ def main() -> None:
                 balls.append(Ball(cx + 20 * (i + 1), cy, config))
             particles = ParticleSystem()
             floating_texts = FloatingTextSystem()
-            game_won = False
             notifications.add("PRESTIGE! Nowa runda rozpoczeta.",
                               color=(255, 150, 50), lifetime=4.0)
             # Sprawdź osiągnięcia prestige
@@ -220,7 +217,6 @@ def main() -> None:
                                        state.upgrade_multi_ball + 1)
                     particles = ParticleSystem()
                     floating_texts = FloatingTextSystem()
-                    game_won = False
                     powerup_system = PowerUpSystem()
                 if event.key == pygame.K_F5:
                     if save_game(state):
@@ -239,7 +235,6 @@ def main() -> None:
                     tree_view.state = state
                     prestige_view.state = state
                     achievements_view.state = state
-                    game_won = False
                     powerup_system = PowerUpSystem()
                     notifications.add("Reset! Nowa gra.", color=(220, 80, 80), lifetime=2.0)
 
@@ -268,6 +263,10 @@ def main() -> None:
 
             elif tab_bar.active == 5:
                 settings_view.handle_event(event, config, current_game_w, current_game_h)
+                # Suwaki sterują wejściami pól pochodnych — przeliczamy od
+                # razu, żeby zmiana była widoczna bez czekania na zakup
+                # albo awans fali.
+                config.apply_upgrades(state)
 
         # ----------------------------------------------------------------
         # Logika gry (zawsze w tle, niezależnie od aktywnej zakładki)
@@ -278,7 +277,7 @@ def main() -> None:
         # steps() wołamy zawsze, żeby opróżnić akumulator — inaczej po
         # przerwie gra nadrabiałaby zaległość z pauzy.
         for _ in range(physics.steps(frame_dt)):
-            if game_won or crush_pause > 0.0:
+            if crush_pause > 0.0:
                 break
 
             # Aktualizuj power-upy
@@ -287,13 +286,16 @@ def main() -> None:
             for ball in balls:
                 ball.update(dt)
 
-            # Wylot poza ekran = wygrana
+            # Piłka, która przeleciała przez dziurę ostatniego okręgu, wylatuje
+            # poza planszę. Wraca do środka zamiast zamrażać grę — w grze idle
+            # pętla ma się kręcić bez udziału gracza.
             for ball in balls:
                 margin = ball.radius
                 if (ball.x < -margin or ball.x > current_game_w + margin or
                         ball.y < -margin or ball.y > current_game_h + margin):
-                    game_won = True
-                    break
+                    ball.reset(cx, cy)
+                    notifications.add("Pilka uciekla - wraca do srodka.",
+                                      color=(180, 180, 220), lifetime=2.0)
 
             # Pole okręgów — zwężanie, spawn i sprzątanie; ice spowalnia zwężanie
             ice_mult = 0.05 if powerup_system.ice_active else 1.0
@@ -426,19 +428,12 @@ def main() -> None:
         # Zakładka 0 (Gra) — tylko HUD, nic dodatkowego w panelu
 
         # Nakładka po zduszeniu — gra wraca sama, bez udziału gracza
-        if crush_pause > 0.0 and not game_won:
+        if crush_pause > 0.0:
             txt = crush_font.render("ZDUSZONY", True, (220, 80, 60))
             screen.blit(txt, txt.get_rect(center=(cx, cy)))
             sub = font.render(f"Fala {state.wave} — gra wraca za "
                               f"{crush_pause:.0f} s", True, (180, 150, 150))
             screen.blit(sub, sub.get_rect(center=(cx, cy + 40)))
-
-        # Ekran wygranej
-        if game_won:
-            txt = win_font.render("Win!", True, (255, 220, 80))
-            screen.blit(txt, txt.get_rect(center=(cx, cy)))
-            sub = font.render("R \u2014 zagraj ponownie", True, (180, 180, 200))
-            screen.blit(sub, sub.get_rect(center=(cx, cy + 50)))
 
         old_cx = cx
         old_cy = cy
