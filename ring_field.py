@@ -27,6 +27,8 @@ class RingField:
         self._rng = rng if rng is not None else random.Random()
         self._last_wave: int = wave
         self._boss_done_for_wave: int | None = None
+        # Jak długo najbardziej wewnętrzny okrąg stoi już na minimum
+        self._time_at_min: float = 0.0
         self.spawn(hp, wave)
 
     def _next_type(self, wave: int) -> RingType:
@@ -64,9 +66,16 @@ class RingField:
         return alive[0] if alive else None
 
     def is_crushed(self) -> bool:
-        """Czy stos dociśnięto do minimum — piłka nie ma już gdzie grać."""
+        """Czy stos dociskał piłkę do minimum dłużej niż karencja.
+
+        Samo dojechanie do minimum nie kończy rundy — przy minimalnym promieniu
+        piłka odbija się kilka razy na sekundę, więc karencja jest jej oknem na
+        dobicie okręgu gołym odbijaniem, bez ulepszeń dziur.
+        """
         inner = self.innermost()
-        return inner is not None and inner.radius <= self.config.ring_min_radius
+        return (inner is not None
+                and inner.radius <= self.config.ring_min_radius
+                and self._time_at_min >= self.config.crush_grace)
 
     def has_room(self) -> bool:
         """Czy jest miejsce na kolejny okrąg.
@@ -97,6 +106,14 @@ class RingField:
         for ring in self.rings:
             if ring.alive and ring.radius < self.config.ring_min_radius:
                 ring.radius = self.config.ring_min_radius
+
+        # Odmierzanie karencji. Zeruje się, gdy przy piłce stoi okrąg większy
+        # od minimum — czyli gdy gracz dobił dociskający i presja odpuściła.
+        inner = self.innermost()
+        if inner is not None and inner.radius <= self.config.ring_min_radius:
+            self._time_at_min += dt
+        else:
+            self._time_at_min = 0.0
 
         self.spawn_timer += dt
         if self.spawn_timer >= self.config.ring_spawn_interval:

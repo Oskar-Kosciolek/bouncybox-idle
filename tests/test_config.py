@@ -18,7 +18,7 @@ def test_apply_upgrades_twice_gives_same_result():
 
 
 def test_max_hole_size_is_recomputed_not_accumulated():
-    """Baza 10° + 5x10° z ulepszeń + 5x8° z prestige = 100°, niezależnie od
+    """5x10° z ulepszeń + 5x8° z prestige = 90°, niezależnie od
     tego, ile razy apply_upgrades zostanie wywołane."""
     config = Config()
     state = GameState()
@@ -28,7 +28,7 @@ def test_max_hole_size_is_recomputed_not_accumulated():
     for _ in range(20):          # 20 zakupów/awansów fali
         config.apply_upgrades(state)
 
-    assert config.hole_size == 100.0
+    assert config.hole_size == 90.0
 
 
 def test_shrink_speed_depends_only_on_current_wave():
@@ -66,16 +66,27 @@ def test_hole_count_does_not_accumulate_between_calls():
     assert config.hole_count == 1 + 2   # baza + poziomy ulepszenia
 
 
-def test_fresh_game_ring_has_a_hole():
-    """Bez dziury świeży gracz nie zniszczy żadnego okręgu: przy 1 obrażeniu
-    na odbicie piłka nie zdejmie 100 HP, zanim stos zdusi ją na minimum.
-    Zero monet oznacza zero ulepszeń, czyli grę zablokowaną na starcie."""
+def test_fresh_game_ring_has_no_usable_hole():
+    """Dziura na starcie psuła balans: przy 77 odbiciach na fali 1 trafiał się
+    prawie pewny darmowy zabój, więc ulepszenia dziur traciły sens. Świeży
+    gracz dobija okręgi karencją przed zduszeniem, nie dziurą."""
     config = Config()
 
     config.apply_upgrades(GameState())
 
+    assert config.hole_size == 0.0
+
+
+def test_first_hole_size_upgrade_takes_effect_immediately():
+    """Okrąg ma od startu jedną dziurę o zerowej szerokości. Bez niej pierwszy
+    poziom `hole_size` byłby pustym wydatkiem, bo drzewko wymaga kupienia
+    rozmiaru przed liczbą dziur, a rozmiar bez liczby nie robi nic."""
+    config = Config()
+
+    config.apply_upgrades(GameState(upgrade_hole_size=1))
+
     assert config.hole_count >= 1
-    assert config.hole_size > 0.0
+    assert config.hole_size == 10.0
 
 
 def test_maxed_hole_upgrades_still_leave_a_solid_arc():
@@ -96,7 +107,7 @@ def test_hole_cap_does_not_touch_early_upgrades():
 
     config.apply_upgrades(GameState(upgrade_hole_size=2))
 
-    assert config.hole_size == 10.0 + 2 * 10.0
+    assert config.hole_size == 2 * 10.0
 
 
 def test_shrink_speed_stops_growing_at_high_waves():

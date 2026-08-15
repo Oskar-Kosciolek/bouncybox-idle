@@ -124,10 +124,12 @@ def test_fresh_field_is_not_crushed():
     assert field.is_crushed() is False
 
 
-def test_field_reports_crush_when_innermost_reaches_minimum():
-    """Okrąg dociśnięty do minimum nie zostawia piłce miejsca na grę."""
+def test_minimum_radius_is_what_triggers_the_crush():
+    """Bez karencji zduszenie zależy wyłącznie od promienia — to on jest
+    progiem, a crush_grace tylko odracza wykonanie kary."""
     config, field = _field()
     config.ring_min_radius = 30.0
+    config.crush_grace = 0.0
     config.ring_shrink_speed = 1000.0
 
     field.update(1.0, hp=100, wave=1)
@@ -388,3 +390,51 @@ def test_boss_returns_after_losing_and_regaining_the_wave():
     field.clear(hp=100, wave=10)    # gracz odbudował falę
 
     assert field.rings[0].type.id == "boss"
+
+
+def test_ring_at_minimum_is_not_crushed_immediately():
+    """Karencja daje piłce czas na dobicie dociśniętego okręgu. Przy minimalnym
+    promieniu piłka odbija się kilka razy na sekundę, więc te kilka sekund
+    wystarcza na fali 1 — i już nie wystarcza od fali 2."""
+    config, field = _field()
+    config.ring_min_radius = 30.0
+    config.crush_grace = 6.0
+    config.ring_shrink_speed = 1000.0
+
+    field.update(1.0, hp=100, wave=1)
+
+    assert field.is_crushed() is False
+
+
+def test_crush_fires_once_the_grace_period_runs_out():
+    config, field = _field()
+    config.ring_min_radius = 30.0
+    config.crush_grace = 1.0
+    config.ring_shrink_speed = 1000.0
+    field.update(1.0, hp=100, wave=1)          # dojeżdża do minimum
+
+    for _ in range(300):                        # 1,25 s na minimum
+        field.update(1 / 240, hp=100, wave=1)
+
+    assert field.is_crushed() is True
+
+
+def test_next_ring_gets_a_full_grace_period_of_its_own():
+    """Gracz, który zdążył dobić dociśnięty okrąg, nie może zostać zduszony
+    resztką karencji po poprzednim."""
+    config, field = _field()
+    config.ring_min_radius = 30.0
+    config.crush_grace = 1.0
+    config.ring_shrink_speed = 0.0              # nic się samo nie zwęża
+    field.rings[0].radius = 30.0
+
+    for _ in range(300):
+        field.update(1 / 240, hp=100, wave=1)
+    assert field.is_crushed() is True
+
+    field.innermost().destroy()                 # gracz dobija dociśnięty
+    field.update(1 / 240, hp=100, wave=1)       # dosypka stawia nowy
+    field.innermost().radius = 30.0             # nowy też dojeżdża do minimum
+    field.update(1 / 240, hp=100, wave=1)
+
+    assert field.is_crushed() is False

@@ -5,11 +5,13 @@ from dataclasses import dataclass
 # idempotentne: wielokrotne wywołanie daje ten sam wynik.
 BASE_BALL_RADIUS: int = 5
 
-# Każdy okrąg ma od startu jedną dziurę. Bez niej świeży gracz nie jest w
-# stanie zniszczyć niczego: przy 1 obrażeniu na odbicie piłka zdąży zadać
-# ~78 obrażeń, zanim okrąg dojdzie do minimum i zdusi ją przy 100 HP.
-# Zero zabitych okręgów to zero monet, czyli gra zablokowana na starcie.
-BASE_HOLE_SIZE: float = 10.0
+# Okrąg ma od startu jedną dziurę o ZEROWEJ szerokości. Liczba, bo drzewko
+# wymaga kupienia `hole_size` przed `hole_count`, a rozmiar bez choćby jednej
+# dziury nie robi nic — pierwszy zakup w tej gałęzi byłby pustym wydatkiem.
+# Szerokość zero, bo dziura na starcie psuła balans: przy 77 odbiciach na
+# fali 1 darmowy zabój trafiał się niemal na pewno i ulepszenia dziur traciły
+# sens. Świeży gracz dobija okręgi karencją przed zduszeniem (crush_grace).
+BASE_HOLE_SIZE: float = 0.0
 BASE_HOLE_COUNT: int = 1
 BASE_HOLE_MOVE_SPEED: float = 10.0
 BASE_RING_SHRINK_SPEED: float = 1.0
@@ -53,6 +55,13 @@ class Config:
     ring_start_radius: float = 220.0   # promień startowy
     ring_min_radius: float = 30.0      # minimalna wielkość
     ring_max_active: int = 5           # ile okręgów naraz na planszy
+
+    # Ile sekund okrąg stoi na minimalnym promieniu, zanim zdusi piłkę.
+    # Przy minimum piłka odbija się ~5 razy na sekundę, więc karencja jest
+    # oknem na dobicie okręgu bez dziur. Starcza na fali 1 (potrzeba 4,3 s),
+    # nie starcza od fali 2 (13,6 s) — i to jest moment, w którym gracz
+    # musi sięgnąć po ulepszenia dziur.
+    crush_grace: float = 6.0
 
     # Dziury
     hole_count: int = 0                # liczba dziur na okręgu (1-4)
