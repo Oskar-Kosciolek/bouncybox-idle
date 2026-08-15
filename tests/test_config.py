@@ -1,4 +1,4 @@
-from config import Config
+from config import MAX_RING_SHRINK_SPEED, Config
 from game_state import GameState
 
 
@@ -76,3 +76,45 @@ def test_fresh_game_ring_has_a_hole():
 
     assert config.hole_count >= 1
     assert config.hole_size > 0.0
+
+
+def test_maxed_hole_upgrades_still_leave_a_solid_arc():
+    """Okrąg w 100% złożony z dziury ginie od pierwszego dotknięcia — HP,
+    pancerz i boss przestają wtedy cokolwiek znaczyć na końcu progresji."""
+    config = Config()
+    state = GameState(upgrade_hole_size=5, upgrade_hole_count=3,
+                      prestige_hole_size=5)
+
+    config.apply_upgrades(state)
+
+    assert config.hole_count * config.hole_size < 360.0
+
+
+def test_hole_cap_does_not_touch_early_upgrades():
+    """Sufit ma działać dopiero na końcu drzewka, nie odbierać pierwszych zakupów."""
+    config = Config()
+
+    config.apply_upgrades(GameState(upgrade_hole_size=2))
+
+    assert config.hole_size == 10.0 + 2 * 10.0
+
+
+def test_shrink_speed_stops_growing_at_high_waves():
+    """Bez sufitu okrąg na fali 30 żyje 1,6 s i daje piłce 3 odbicia zamiast
+    kilkunastu. Prędkość zwężania sterowała kiedyś samym tempem gry, ale po
+    wprowadzeniu zduszenia steruje też śmiertelnością — i rosła bez granic."""
+    config = Config()
+
+    config.apply_upgrades(GameState(wave=100))
+
+    assert config.ring_shrink_speed == MAX_RING_SHRINK_SPEED
+
+
+def test_shrink_speed_still_grows_on_early_waves():
+    """Sufit nie może spłaszczyć trudności od samego początku."""
+    early = Config()
+    early.apply_upgrades(GameState(wave=2))
+    later = Config()
+    later.apply_upgrades(GameState(wave=6))
+
+    assert later.ring_shrink_speed > early.ring_shrink_speed

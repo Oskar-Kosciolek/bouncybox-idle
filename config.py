@@ -14,6 +14,20 @@ BASE_HOLE_COUNT: int = 1
 BASE_HOLE_MOVE_SPEED: float = 10.0
 BASE_RING_SHRINK_SPEED: float = 1.0
 
+# Łączne pokrycie dziurami nie może domknąć okręgu. Przy maksymalnych
+# ulepszeniach wychodziły 4 dziury po 100°, czyli 400° na obwodzie 360° —
+# nie zostawał ani jeden lity stopień, okrąg ginął od pierwszego dotknięcia,
+# a HP, pancerz i boss przestawały cokolwiek znaczyć.
+MAX_HOLE_COVERAGE: float = 300.0
+
+# Sufit prędkości zwężania. Póki okręgi żyły w nieskończoność, ten parametr
+# sterował wyłącznie tempem gry i mógł rosnąć bez granic. Odkąd okrąg dojeżdża
+# do minimum i dusi piłkę, steruje też śmiertelnością: liniowy wzrost 1+3*fala
+# skracał życie okręgu do 1,6 s na fali 30, czyli 3 odbić zamiast kilkunastu.
+# Trudność ma dalej rosnąć, ale przez HP i typy okręgów, nie przez odbieranie
+# graczowi czasu na reakcję.
+MAX_RING_SHRINK_SPEED: float = 25.0
+
 
 @dataclass
 class Config:
@@ -78,13 +92,17 @@ class Config:
         self.initial_speed_x = speed
         self.initial_speed_y = -speed
         self.ball_radius = BASE_BALL_RADIUS + state.upgrade_ball_size * 2
-        self.hole_size = (BASE_HOLE_SIZE + state.upgrade_hole_size * 10.0
-                          + prestige_hole_bonus)
+        # Liczba dziur przed rozmiarem — sufit rozmiaru zależy od liczby
         self.hole_count = BASE_HOLE_COUNT + state.upgrade_hole_count
+        raw_hole_size = (BASE_HOLE_SIZE + state.upgrade_hole_size * 10.0
+                         + prestige_hole_bonus)
+        self.hole_size = min(raw_hole_size,
+                             MAX_HOLE_COVERAGE / self.hole_count)
         self.hole_moving = state.upgrade_hole_speed > 0
         self.hole_move_speed = (BASE_HOLE_MOVE_SPEED
                                 + state.upgrade_hole_speed * 25.0)
         self.ball_trail_enabled = state.upgrade_ball_trail > 0
-        # Trudność rośnie z falą
-        self.ring_shrink_speed = BASE_RING_SHRINK_SPEED + state.wave * 3.0
+        # Trudność rośnie z falą, ale zwężanie ma sufit
+        self.ring_shrink_speed = min(BASE_RING_SHRINK_SPEED + state.wave * 3.0,
+                                     MAX_RING_SHRINK_SPEED)
         self.ring_spawn_interval = max(1.0, 4.0 - state.wave * 0.2)
