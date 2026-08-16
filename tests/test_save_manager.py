@@ -103,3 +103,29 @@ def test_default_save_path_is_next_to_the_game(tmp_path, monkeypatch):
 
     assert save_manager.SAVE_PATH.parent == save_manager.Path(
         save_manager.__file__).resolve().parent
+
+
+def test_save_stamps_the_current_time(tmp_path):
+    """Bez stempla przy zapisie nie ma od czego liczyć nieobecności."""
+    path = tmp_path / "save.json"
+    state = GameState()
+
+    save_game(state, path)
+
+    assert load_game(path).last_played_at > 0.0
+
+
+def test_old_save_without_a_timestamp_earns_nothing(tmp_path):
+    """Zapisy sprzed tej zmiany nie mają pola — domyślne 0.0 musi znaczyć
+    'brak poprzedniej sesji', nie 'epoka Uniksa'."""
+    path = tmp_path / "save.json"
+    save_game(GameState(wave=20), path)
+
+    data = json.loads(path.read_text(encoding="utf-8"))
+    del data["last_played_at"]
+    path.write_text(json.dumps(data), encoding="utf-8")
+
+    loaded = load_game(path)
+
+    assert loaded.last_played_at == 0.0
+    assert loaded.offline_earnings(now=1e12) == (0.0, 0.0)

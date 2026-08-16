@@ -1,5 +1,10 @@
 from dataclasses import dataclass, field
 
+# Naliczanie za czas poza grą.
+OFFLINE_CAP_SECONDS: float = 8 * 3600.0
+OFFLINE_RATE_PER_WAVE: float = 2.0          # ~1/3 tempa zarabiania w grze
+AUTO_COLLECTOR_OFFLINE_BONUS: float = 2.0
+
 
 @dataclass
 class GameState:
@@ -38,6 +43,11 @@ class GameState:
     prestige_hole_size: int = 0    # max 5, +8° hole_size za poziom
     prestige_coin_mult: int = 0    # max 5, +25% monet za poziom
     prestige_extra_ball: int = 0   # max 2, dodatkowa piłka od startu
+
+    # Czas ostatniego zapisu (unix). 0.0 znaczy "nie było poprzedniej sesji",
+    # a nie "1 stycznia 1970" — inaczej nowy gracz dostałby pełny limit
+    # naliczenia offline zaraz po uruchomieniu gry.
+    last_played_at: float = 0.0
 
     # Osiągnięcia — set odblokowanych id
     achievements_unlocked: set = field(default_factory=set)
@@ -138,6 +148,36 @@ class GameState:
         self.wave = max(1, self.wave - 1)
         self.rings_destroyed_this_wave = 0
         self.rings_to_next_wave = 5 + self.wave * 2
+
+    def offline_earnings(self, now: float) -> tuple[float, float]:
+        """Zwraca (zaliczony czas w sekundach, monety) za nieobecność do `now`.
+
+        Nic nie nalicza, gdy nie było poprzedniej sesji ani gdy zegar cofnięto
+        — zmiana strefy czasowej nie może być źródłem monet.
+        """
+        if self.last_played_at <= 0.0:
+            return 0.0, 0.0
+
+        elapsed = now - self.last_played_at
+        if elapsed <= 0.0:
+            return 0.0, 0.0
+
+        elapsed = min(elapsed, OFFLINE_CAP_SECONDS)
+        rate = self.wave * OFFLINE_RATE_PER_WAVE
+        if self.upgrade_auto_collector > 0:
+            rate *= AUTO_COLLECTOR_OFFLINE_BONUS
+        return elapsed, rate * elapsed
+
+    def claim_offline(self, now: float) -> tuple[float, float]:
+        """Nalicza zarobek offline i dopisuje go do salda.
+
+        Przesuwa znacznik, więc powtórne wywołanie nic już nie wypłaci.
+        """
+        elapsed, coins = self.offline_earnings(now)
+        if coins > 0.0:
+            self.add_coins(coins)
+            self.last_played_at = now
+        return elapsed, coins
 
     def get_ring_hp(self) -> int:
         """Startowe HP okręgu = 100, rośnie o 15 za każdą falę."""

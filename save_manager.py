@@ -1,5 +1,6 @@
 import json
 import os
+import time
 from dataclasses import asdict, fields
 from pathlib import Path
 
@@ -21,6 +22,10 @@ def save_game(state: GameState, path: Path = SAVE_PATH) -> bool:
     Zapis w miejscu obcina plik zanim wpisze nową treść, więc przerwanie w tym
     momencie (brak miejsca, zamknięcie systemu) kasuje cały postęp gracza.
     """
+    # Stempel czasu należy do zapisu, nie do rozgrywki — to zapis jest tym,
+    # od czego liczy się nieobecność.
+    state.last_played_at = time.time()
+
     data = {"version": SAVE_VERSION, **asdict(state)}
     data["achievements_unlocked"] = sorted(state.achievements_unlocked)
 

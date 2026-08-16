@@ -82,3 +82,77 @@ def test_type_multiplier_defaults_to_neutral():
     explicit = GameState(wave=3).on_ring_destroyed(type_multiplier=1.0)
 
     assert without == explicit
+
+
+HOUR = 3600.0
+
+
+def test_no_offline_earnings_without_a_previous_session():
+    """Świeży stan ma last_played_at = 0.0, czyli epokę Uniksa. Bez tej bramki
+    nowy gracz dostałby pełny limit naliczenia na starcie."""
+    state = GameState(wave=10, last_played_at=0.0)
+
+    away, coins = state.offline_earnings(now=1_000_000.0)
+
+    assert (away, coins) == (0.0, 0.0)
+
+
+def test_offline_earnings_scale_with_the_wave():
+    early = GameState(wave=5, last_played_at=0.0)
+    late = GameState(wave=40, last_played_at=0.0)
+    early.last_played_at = late.last_played_at = 1000.0
+
+    _, early_coins = early.offline_earnings(now=1000.0 + HOUR)
+    _, late_coins = late.offline_earnings(now=1000.0 + HOUR)
+
+    assert late_coins > early_coins
+
+
+def test_auto_collector_doubles_the_offline_rate():
+    plain = GameState(wave=10, last_played_at=1000.0)
+    upgraded = GameState(wave=10, last_played_at=1000.0,
+                         upgrade_auto_collector=1)
+
+    _, plain_coins = plain.offline_earnings(now=1000.0 + HOUR)
+    _, upgraded_coins = upgraded.offline_earnings(now=1000.0 + HOUR)
+
+    assert upgraded_coins == plain_coins * 2
+
+
+def test_offline_earnings_are_capped():
+    """Bez limitu tygodniowa przerwa dawałaby tyle, ile miesiąc grania."""
+    state = GameState(wave=10, last_played_at=1000.0)
+
+    away_a_day, coins_a_day = state.offline_earnings(now=1000.0 + 24 * HOUR)
+    away_a_week, coins_a_week = state.offline_earnings(now=1000.0 + 168 * HOUR)
+
+    assert coins_a_day == coins_a_week
+    assert away_a_day == away_a_week
+
+
+def test_clock_going_backwards_earns_nothing():
+    """Zmiana strefy albo korekta zegara nie może być źródłem monet."""
+    state = GameState(wave=10, last_played_at=5000.0)
+
+    away, coins = state.offline_earnings(now=1000.0)
+
+    assert (away, coins) == (0.0, 0.0)
+
+
+def test_claiming_offline_adds_the_coins():
+    state = GameState(wave=10, last_played_at=1000.0)
+
+    _, coins = state.claim_offline(now=1000.0 + HOUR)
+
+    assert coins > 0
+    assert state.coins > 0
+
+
+def test_offline_cannot_be_claimed_twice():
+    """Naliczenie przesuwa znacznik, więc powtórne wywołanie nie płaci."""
+    state = GameState(wave=10, last_played_at=1000.0)
+
+    state.claim_offline(now=1000.0 + HOUR)
+    _, second = state.claim_offline(now=1000.0 + HOUR)
+
+    assert second == 0.0

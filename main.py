@@ -1,4 +1,6 @@
 import random
+import time
+
 import pygame
 
 from ball import Ball
@@ -95,6 +97,10 @@ def main() -> None:
     state = load_game() or GameState()
     config.apply_upgrades(state)
 
+    # Naliczenie za czas poza grą — powiadomienie dodajemy niżej, gdy
+    # system powiadomień już istnieje.
+    away_seconds, offline_coins = state.claim_offline(time.time())
+
     current_game_w, current_game_h, cx, cy = update_dimensions(screen)
     old_cx, old_cy = cx, cy
 
@@ -115,6 +121,11 @@ def main() -> None:
     prestige_view = PrestigeView(state, PRESTIGE_UPGRADES)
     achievements_view = AchievementsView(state, ACHIEVEMENTS)
     notifications = NotificationSystem()
+    if offline_coins > 0:
+        notifications.add(
+            f"Nieobecnosc {away_seconds / 3600:.1f}h — "
+            f"zarobiles {short_number(offline_coins)} monet",
+            color=(150, 220, 255), lifetime=8.0)
     powerup_system = PowerUpSystem()
     settings_view = SettingsView()
     autosave_timer: float = 0.0
