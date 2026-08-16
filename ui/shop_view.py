@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 
 from constants import PANEL_W
 from ui.tab_bar import TAB_TOTAL_HEIGHT
+from formatting import short_number
 
 if TYPE_CHECKING:
     from game_state import GameState
@@ -181,7 +182,7 @@ class ShopView:
             surface.blit(lock_surf, (ix, btn_y + 6))
         else:
             cost = upg.cost_at_level(lvl)
-            cost_surf = font.render(f"{cost:.0f}", True,
+            cost_surf = font.render(short_number(cost), True,
                                     _COL_COST if affordable else _COL_DESC)
             surface.blit(cost_surf, (ix, btn_y + 6))
 

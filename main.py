@@ -22,6 +22,7 @@ from ui.floating_text import FloatingTextSystem
 from constants import PANEL_W, FPS, BG_COLOR
 from save_manager import save_game, load_game, delete_save
 from timestep import FixedTimestep
+from formatting import short_number
 
 
 def update_dimensions(screen: pygame.Surface) -> tuple[int, int, int, int]:
@@ -65,7 +66,7 @@ def _notify_achievements(newly_unlocked: list,
     for ach in newly_unlocked:
         if ach.reward_coins > 0:
             notifications.add(
-                f"Osiagniecie: {ach.name}! +{ach.reward_coins:.0f} monet",
+                f"Osiagniecie: {ach.name}! +{short_number(ach.reward_coins)} monet",
                 color=(255, 220, 80),
             )
         else:
@@ -161,7 +162,7 @@ def main() -> None:
                     type_multiplier=target.type.coin_multiplier)
                 particles.explode_ring(target.cx, target.cy,
                                        target.radius, target.color)
-                notifications.add(f"BOMBA! +{coins:.0f} monet", (220, 80, 60))
+                notifications.add(f"BOMBA! +{short_number(coins)} monet", (220, 80, 60))
             else:
                 notifications.add("Bomba - brak celu!", (220, 80, 60))
 
@@ -335,12 +336,12 @@ def main() -> None:
                             if not collided:
                                 # Piłka trafiła w dziurę
                                 notifications.add(
-                                    f"Dziura! +{coins:.0f} monet",
+                                    f"Dziura! +{short_number(coins)} monet",
                                     color=(255, 220, 50))
                             else:
                                 # Okrąg starty przez odbicia
                                 notifications.add(
-                                    f"Zniszczony! +{coins:.0f} monet",
+                                    f"Zniszczony! +{short_number(coins)} monet",
                                     color=(100, 200, 255))
                             wave_up = state.check_wave_progress()
                             if wave_up:
@@ -350,7 +351,7 @@ def main() -> None:
                             # Floating text — zdobyte monety w miejscu okręgu
                             floating_texts.add(
                                 ring.cx, ring.cy,
-                                f"+{coins:.0f}",
+                                f"+{short_number(coins)}",
                                 color=(255, 220, 50),
                                 lifetime=1.2,
                             )

@@ -1,6 +1,8 @@
 import pygame
 from typing import TYPE_CHECKING
 
+from formatting import short_number
+
 if TYPE_CHECKING:
     from game_state import GameState
 
@@ -37,7 +39,7 @@ class GameView:
         mid_y = hud_rect.centery
 
         # Monety (lewa strona)
-        coins_str = f"\U0001f4b0 {state.coins:,.0f}"
+        coins_str = f"\U0001f4b0 {short_number(state.coins)}"
         coins_surf = font.render(coins_str, True, _COL_COIN)
         surface.blit(coins_surf, (hud_rect.x + pad, mid_y - coins_surf.get_height() // 2))
 
