@@ -5,6 +5,11 @@ from config import Config
 from ring_types import NORMAL, RingType
 
 
+# Blokada po trafieniu w dziurę. Piłka przecina pasmo kolizji przez ~0,08 s,
+# więc bez niej jeden przelot zadawałby kilka ciosów zamiast jednego.
+HOLE_HIT_COOLDOWN: float = 0.2
+
+
 class CircleRing:
     def __init__(self, config: Config, window_size: tuple, hp: int = 100,
                  ring_type: RingType = NORMAL) -> None:
@@ -151,8 +156,13 @@ class CircleRing:
         angle = math.degrees(math.atan2(dy, dx)) % 360
 
         if self.is_point_in_hole(angle):
-            # Dziura — natychmiastowe zniszczenie
-            self.destroy()
+            # Dziura — piłka przelatuje bez odbicia, ale zadaje duży cios.
+            # Zwracamy False także wtedy, gdy okrąg od tego ginie: pętla główna
+            # po tym właśnie rozpoznaje "Dziura!" kontra "Zniszczony!".
+            if ball.hole_cooldown <= 0.0:
+                self.hit(self.config.ball_damage
+                         * self.config.hole_damage_multiplier)
+                ball.hole_cooldown = HOLE_HIT_COOLDOWN
             return False
 
         if ball.collision_cooldown > 0:

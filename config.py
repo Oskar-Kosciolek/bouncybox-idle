@@ -70,6 +70,18 @@ class Config:
     # musi sięgnąć po ulepszenia dziur.
     crush_grace: float = 6.0
 
+    # Ile obrażeń piłki wart jest przelot przez dziurę. Dziura zabijała dawniej
+    # natychmiast, przez co zawsze strzelała pierwsza: 2877 z 2915 zabójstw
+    # w godzinnym pomiarze szło przez nią, a ulepszenia obrażeń nie wpływały
+    # na nic. Jako mnożnik obie drogi mnożą się zamiast konkurować, a pancerz
+    # i boss znów wymagają więcej trafień niż zwykły okrąg.
+    # 40, nie mniej: przy 15 gracz czekał 24 minuty na falę 2, przy 25 — 19.
+    # Przy 40 fala 2 przychodzi po 6 minutach, a typy okręgów i tak różnią się
+    # przez pierwsze kilkanaście minut (start: 3 trafienia na zwykły, 8 na
+    # pancerny, 10 na bossa). Później gracz je wyrasta, bo obrażenia rosną
+    # w sesji ~70-krotnie, a HP okręgu tylko ~7-krotnie.
+    hole_damage_multiplier: int = 40
+
     # Wejścia dla pól pochodnych. Suwaki w panelu Ustawienia sterują właśnie
     # nimi, a nie ring_shrink_speed czy ring_spawn_interval — te dwa są
     # przeliczane przy każdym zakupie i awansie fali, więc wartość wpisana
@@ -116,8 +128,13 @@ class Config:
         self.initial_speed_x = speed
         self.initial_speed_y = -speed
         self.ball_radius = BASE_BALL_RADIUS + state.upgrade_ball_size * 2
-        self.ball_damage = max(1, round(
-            BASE_BALL_DAMAGE * DAMAGE_PER_LEVEL ** state.upgrade_ball_damage))
+        # Podłoga +1 za poziom, bo samo round(1.25^n) powtarzało wartość na
+        # poziomach 1, 3 i 4 — zakup za 200 monet nie zmieniał wtedy nic.
+        # Wykładnik przejmuje prowadzenie koło poziomu 12.
+        level = state.upgrade_ball_damage
+        self.ball_damage = max(
+            BASE_BALL_DAMAGE + level,
+            round(BASE_BALL_DAMAGE * DAMAGE_PER_LEVEL ** level))
         # Liczba dziur przed rozmiarem — sufit rozmiaru zależy od liczby
         self.hole_count = BASE_HOLE_COUNT + state.upgrade_hole_count
         raw_hole_size = (BASE_HOLE_SIZE + state.upgrade_hole_size * 10.0

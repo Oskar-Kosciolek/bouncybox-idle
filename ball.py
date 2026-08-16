@@ -20,6 +20,9 @@ class Ball:
         self.color = self.base_color
         self.hit_flash: float = 0.0   # timer błysku koloru po odbiciu
         self.collision_cooldown = 0.0  # czas blokady po ostatnim odbiciu
+        # Osobna blokada dla trafień w dziurę. Wspólna z odbiciami blokowałaby
+        # też odbicia i groziła przelotem przez sąsiedni okrąg.
+        self.hole_cooldown = 0.0
         self._trail: list[tuple[float, float]] = []  # historia pozycji do smugi
         # Stała prędkość bazowa — utrzymywana po każdym odbiciu
         self.base_speed: float = math.sqrt(
@@ -32,6 +35,7 @@ class Ball:
             self.vy += self.config.gravity_strength * dt
 
         self.collision_cooldown = max(0.0, self.collision_cooldown - dt)
+        self.hole_cooldown = max(0.0, self.hole_cooldown - dt)
         # Zapisz pozycję do smugi (max 20 punktów)
         self._trail.append((self.x, self.y))
         if len(self._trail) > 20:
@@ -65,6 +69,7 @@ class Ball:
         self.vx = self.config.initial_speed_x
         self.vy = self.config.initial_speed_y
         self.collision_cooldown = 0.0
+        self.hole_cooldown = 0.0
         self._trail.clear()
 
     def draw(self, surface: pygame.Surface, dt: float = 0.0) -> None:

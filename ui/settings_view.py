@@ -20,6 +20,7 @@ _COL_BORDER  = (40,  40,  55)
 # trzymał. Sterujemy tu ich wejściami.
 _SLIDERS: list[tuple[str, str, float, float, bool]] = [
     ("Karencja zduszenia (s)",  "crush_grace",            0.0,  20.0, True),
+    ("Dziura x obrazen",        "hole_damage_multiplier",  1.0, 100.0, False),
     ("Zwezanie na fale",        "shrink_per_wave",        0.0,  10.0, True),
     ("Sufit zwezania",          "max_shrink_speed",       5.0, 100.0, True),
     ("Min odstep spawnu (s)",   "min_spawn_interval",     0.2,   5.0, True),

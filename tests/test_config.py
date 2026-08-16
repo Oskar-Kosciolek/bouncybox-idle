@@ -189,15 +189,28 @@ def test_no_settings_slider_targets_a_derived_field():
     assert targeted & derived == set()
 
 
-def test_ball_damage_scales_multiplicatively_with_the_upgrade():
+def test_ball_damage_grows_exponentially_at_high_levels():
     """Dodawanie stałej przy koszcie wykładniczym daje wzrost logarytmiczny,
     a wymagania (HP okręgu) rosną liniowo z falą — dodawanie nigdy nie nadąży.
-    Mnożenie nadąża: 1.25^17 to 44 obrażenia przy milionie monet."""
+    Od poziomu ~12 prowadzenie przejmuje wykładnik."""
     config = Config()
 
-    config.apply_upgrades(GameState(upgrade_ball_damage=10))
+    config.apply_upgrades(GameState(upgrade_ball_damage=20))
 
-    assert config.ball_damage == round(1.25 ** 10)
+    assert config.ball_damage == round(1.25 ** 20)
+
+
+def test_ball_damage_upgrade_has_no_dead_levels():
+    """round(1.25^n) powtarzało wartość na poziomach 1, 3 i 4 — zakup za
+    200 monet nie zmieniał wtedy nic, jak kiedyś rozmiar dziury bez dziury."""
+    config = Config()
+
+    damage = []
+    for level in range(13):
+        config.apply_upgrades(GameState(upgrade_ball_damage=level))
+        damage.append(config.ball_damage)
+
+    assert all(later > earlier for earlier, later in zip(damage, damage[1:]))
 
 
 def test_ball_damage_is_at_least_one():

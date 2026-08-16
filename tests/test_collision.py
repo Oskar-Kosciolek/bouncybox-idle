@@ -37,13 +37,15 @@ def test_bounced_ball_stays_on_the_side_it_came_from():
     assert distance > ring.radius
 
 
-def test_ball_jumping_through_hole_destroys_ring():
+def test_ball_jumping_through_hole_still_registers_the_hit():
     """Trafienie w dziurę liczy się także wtedy, gdy piłka przeskoczyła
-    przez nią w jednym kroku."""
+    przez nią w jednym kroku. Okrąg ma tu HP mieszczące się w jednym ciosie,
+    bo dziura zadaje obrażenia, a nie zabija natychmiast."""
     config, ring = _board()
     config.hole_count = 1
     config.hole_size = 40.0
     ring.holes = [270.0]                   # dziura na górze okręgu
+    ring.max_hp = ring.hp = 5
     ball = Ball(200.0, -60.0, config)
     ball.vx, ball.vy = 0.0, 80.0 / STEP
 
@@ -86,3 +88,74 @@ def test_ball_tunneling_outward_is_sent_back_inside():
 
     distance = ((ball.x - ring.cx) ** 2 + (ball.y - ring.cy) ** 2) ** 0.5
     assert distance < ring.radius
+
+
+def _ring_with_hole(hp: int = 100, ring_type=None):
+    """Okrąg z dziurą na górze (kąt 270) — tam, gdzie przelatuje piłka."""
+    from ring_types import NORMAL
+
+    config = Config()
+    config.hole_count = 1
+    config.hole_size = 40.0
+    ring = CircleRing(config, (400, 400), hp=hp,
+                      ring_type=ring_type if ring_type else NORMAL)
+    ring.holes = [270.0]
+    return config, ring
+
+
+def _cross_the_hole(config, ring) -> None:
+    """Przepuszcza świeżą piłkę przez dziurę jednym skokiem."""
+    ball = Ball(200.0, -60.0, config)
+    ball.vx, ball.vy = 0.0, 80.0 / STEP
+    ball.update(STEP)
+    ring.check_collision(ball)
+
+
+def test_hole_hit_damages_the_ring_instead_of_destroying_it():
+    """Natychmiastowe zabicie sprawiało, że dziura zawsze strzelała pierwsza:
+    w godzinnym pomiarze 2877 z 2915 zabójstw szło przez dziurę, więc
+    ulepszenia obrażeń nie miały żadnego wpływu na rozgrywkę."""
+    config, ring = _ring_with_hole(hp=100)
+
+    _cross_the_hole(config, ring)
+
+    assert ring.alive is True
+    assert ring.hp == 100 - config.ball_damage * config.hole_damage_multiplier
+
+
+def test_hole_hit_still_kills_a_ring_it_can_finish():
+    config, ring = _ring_with_hole(hp=10)
+
+    _cross_the_hole(config, ring)
+
+    assert ring.alive is False
+
+
+def test_hole_hit_registers_once_per_pass():
+    """Piłka siedzi w paśmie kolizji przez kilka kroków fizyki. Bez osobnego
+    licznika jeden przelot dawałby kilka trafień zamiast jednego."""
+    config, ring = _ring_with_hole(hp=1000)
+    ball = Ball(200.0, -60.0, config)
+    ball.vx, ball.vy = 0.0, 80.0 / STEP
+    ball.update(STEP)
+
+    ring.check_collision(ball)
+    hp_after_first = ring.hp
+    ring.check_collision(ball)
+
+    assert ring.hp == hp_after_first
+
+
+def test_armoured_ring_needs_more_hole_hits_than_a_normal_one():
+    """Sedno zmiany: typ okręgu ma znów cokolwiek znaczyć."""
+    from ring_types import ARMORED, NORMAL
+
+    def hits_to_kill(ring_type) -> int:
+        config, ring = _ring_with_hole(hp=100, ring_type=ring_type)
+        hits = 0
+        while ring.alive and hits < 200:
+            _cross_the_hole(config, ring)
+            hits += 1
+        return hits
+
+    assert hits_to_kill(ARMORED) > hits_to_kill(NORMAL)
