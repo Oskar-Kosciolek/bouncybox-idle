@@ -154,7 +154,11 @@ class ShopView:
 
         # Wiersz 1: nazwa + poziom
         name_col = _COL_DESC if not unlocked else _COL_TEXT
-        name_str = f"{upg.name}  Lv.{lvl}/{upg.max_level}"
+        # Ulepszenie bez sufitu nie ma czego pokazać po ukośniku
+        if upg.max_level is None:
+            name_str = f"{upg.name}  Lv.{lvl}"
+        else:
+            name_str = f"{upg.name}  Lv.{lvl}/{upg.max_level}"
         name_surf = font.render(name_str, True, name_col)
         surface.blit(name_surf, (ix, iy))
 

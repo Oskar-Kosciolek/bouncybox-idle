@@ -11,7 +11,7 @@ class Upgrade:
     name: str
     description: str
     branch: str           # "ball" | "rings" | "economy"
-    max_level: int
+    max_level: Optional[int]   # None = bez sufitu poziomów
     base_cost: float      # koszt pierwszego poziomu
     cost_multiplier: float = 2.0  # każdy poziom droższy x razy
     requires: Optional[str] = None   # id innego upgrade który musi być > 0
@@ -25,7 +25,14 @@ class Upgrade:
         return getattr(state, f"upgrade_{self.id}")
 
     def is_maxed(self, state) -> bool:
-        """Sprawdza czy ulepszenie jest na maksymalnym poziomie."""
+        """Sprawdza czy ulepszenie jest na maksymalnym poziomie.
+
+        Ulepszenie bez sufitu (`max_level is None`) nigdy nie jest maksymalne —
+        to ono jest ujściem dla monet. Sufit oznacza skończoną pojemność
+        wydatków, a przychód w tej grze rośnie bez końca.
+        """
+        if self.max_level is None:
+            return False
         return self.current_level(state) >= self.max_level
 
     def can_afford(self, state) -> bool:
@@ -93,6 +100,10 @@ UPGRADES: list[Upgrade] = [
     Upgrade("ball_size",     "Rozmiar piłki",     "Większa piłka = łatwiej",   "ball",    3, 80.0,  requires="ball_speed"),
     Upgrade("multi_ball",    "Multi-ball",        "Dodatkowa piłka na planszy", "ball",   2, 300.0, requires="ball_speed"),
     Upgrade("ball_trail",    "Smuga",             "Efekt wizualny smugi",       "ball",   1, 150.0, requires="ball_speed"),
+    # Bez sufitu — ujście dla monet po wyczerpaniu reszty drzewka. Efekt mnożny,
+    # bo HP okręgu rośnie liniowo z falą, a przy koszcie wykładniczym dodawanie
+    # stałej dawałoby wzrost logarytmiczny, który nigdy by nie nadążył.
+    Upgrade("ball_damage",   "Sila uderzenia",    "+25% obrazen za poziom",     "ball", None, 200.0, cost_multiplier=1.6, requires="ball_speed"),
 
     # Gałąź: Okręgi
     Upgrade("hole_size",     "Rozmiar dziury",    "+10° rozmiar dziury",        "rings",  5, 60.0),

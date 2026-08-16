@@ -187,3 +187,33 @@ def test_no_settings_slider_targets_a_derived_field():
     targeted = {field for _, field, *_ in _SLIDERS}
 
     assert targeted & derived == set()
+
+
+def test_ball_damage_scales_multiplicatively_with_the_upgrade():
+    """Dodawanie stałej przy koszcie wykładniczym daje wzrost logarytmiczny,
+    a wymagania (HP okręgu) rosną liniowo z falą — dodawanie nigdy nie nadąży.
+    Mnożenie nadąża: 1.25^17 to 44 obrażenia przy milionie monet."""
+    config = Config()
+
+    config.apply_upgrades(GameState(upgrade_ball_damage=10))
+
+    assert config.ball_damage == round(1.25 ** 10)
+
+
+def test_ball_damage_is_at_least_one():
+    config = Config()
+
+    config.apply_upgrades(GameState())
+
+    assert config.ball_damage == 1
+
+
+def test_ball_damage_is_recomputed_not_accumulated():
+    config = Config()
+    state = GameState(upgrade_ball_damage=5)
+
+    config.apply_upgrades(state)
+    first = config.ball_damage
+    config.apply_upgrades(state)
+
+    assert config.ball_damage == first

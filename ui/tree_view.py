@@ -102,8 +102,9 @@ class TreeView:
         if not unlocked:
             fill_col = _COL_LOCKED
         elif lvl > 0:
-            # Wypełniony kolorem gałęzi (jasność zależy od poziomu)
-            t = lvl / upg.max_level
+            # Wypełniony kolorem gałęzi (jasność zależy od poziomu).
+            # Bez sufitu nie ma ułamka postępu — węzeł świeci pełnią.
+            t = 1.0 if upg.max_level is None else lvl / upg.max_level
             fill_col = tuple(int(c * (0.4 + 0.6 * t)) for c in branch_color)
         else:
             fill_col = (35, 35, 50)
@@ -134,8 +135,9 @@ class TreeView:
         bar_x = cx - _NODE_R
         pygame.draw.rect(surface, (40, 40, 55),
                          pygame.Rect(bar_x, bar_y, bar_w, bar_h))
-        if upg.max_level > 0 and lvl > 0:
-            fill_w = int(bar_w * lvl / upg.max_level)
+        if lvl > 0 and (upg.max_level is None or upg.max_level > 0):
+            ratio = 1.0 if upg.max_level is None else lvl / upg.max_level
+            fill_w = int(bar_w * ratio)
             bar_col = branch_color if not maxed else (180, 220, 100)
             pygame.draw.rect(surface, bar_col,
                              pygame.Rect(bar_x, bar_y, fill_w, bar_h))

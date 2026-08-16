@@ -4,6 +4,13 @@ from dataclasses import dataclass
 # apply_upgrades startuje od nich za każdym razem, dzięki czemu jest
 # idempotentne: wielokrotne wywołanie daje ten sam wynik.
 BASE_BALL_RADIUS: int = 5
+BASE_BALL_DAMAGE: int = 1
+
+# Obrażenia rosną mnożnie, a nie o stałą. HP okręgu rośnie liniowo z falą
+# (100 + 15*fala), więc przy koszcie wykładniczym dodawanie stałej dawałoby
+# wzrost logarytmiczny — przy stu milionach monet wciąż 19 obrażeń, czyli
+# za mało nawet na falę 10. Mnożenie nadąża za wymaganiami.
+DAMAGE_PER_LEVEL: float = 1.25
 
 # Okrąg ma od startu jedną dziurę o ZEROWEJ szerokości. Liczba, bo drzewko
 # wymaga kupienia `hole_size` przed `hole_count`, a rozmiar bez choćby jednej
@@ -109,6 +116,8 @@ class Config:
         self.initial_speed_x = speed
         self.initial_speed_y = -speed
         self.ball_radius = BASE_BALL_RADIUS + state.upgrade_ball_size * 2
+        self.ball_damage = max(1, round(
+            BASE_BALL_DAMAGE * DAMAGE_PER_LEVEL ** state.upgrade_ball_damage))
         # Liczba dziur przed rozmiarem — sufit rozmiaru zależy od liczby
         self.hole_count = BASE_HOLE_COUNT + state.upgrade_hole_count
         raw_hole_size = (BASE_HOLE_SIZE + state.upgrade_hole_size * 10.0
