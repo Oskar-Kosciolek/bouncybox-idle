@@ -26,18 +26,27 @@ BOUNCE_PITCH_STEPS: int = 12
 _MIXER_CHANNELS: int = 24
 
 
+def ring_tension(radius: float, min_radius: float,
+                 start_radius: float) -> float:
+    """Jak blisko zduszenia jest okrąg: 1.0 na minimum, 0.0 świeżo postawiony.
+
+    Promień bywa poza widełkami — dzieci po podziale i okręgi dociśnięte do
+    minimum — więc wynik jest przycinany.
+    """
+    span = max(1.0, start_radius - min_radius)
+    ratio = (radius - min_radius) / span
+    return max(0.0, min(1.0, 1.0 - ratio))
+
+
 def bounce_frequency(radius: float, min_radius: float,
                      start_radius: float) -> float:
     """Wysokość odbicia dla okręgu o danym promieniu.
 
     Kurczący się okrąg brzmi coraz wyżej, więc narastające zagrożenie słychać,
-    zanim się je zobaczy. Promień bywa poza widełkami — dzieci po podziale
-    i okręgi dociśnięte do minimum — więc wynik jest przycinany.
+    zanim się je zobaczy.
     """
-    span = max(1.0, start_radius - min_radius)
-    ratio = (radius - min_radius) / span
-    ratio = max(0.0, min(1.0, ratio))
-    return BOUNCE_LOW_HZ + (BOUNCE_HIGH_HZ - BOUNCE_LOW_HZ) * (1.0 - ratio)
+    tension = ring_tension(radius, min_radius, start_radius)
+    return BOUNCE_LOW_HZ + (BOUNCE_HIGH_HZ - BOUNCE_LOW_HZ) * tension
 
 
 def should_play_bounce(last_play: float, now: float) -> bool:

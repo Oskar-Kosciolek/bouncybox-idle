@@ -85,6 +85,9 @@ class Config:
     # Głośność dźwięków, 0.0 = wyciszenie. W grze zostawianej w tle na godziny
     # brak wyciszenia jest wadą, nie brakiem funkcji.
     sound_volume: float = 0.4
+    # Muzyka ciszej niż efekty i osobno, bo "efekty bez muzyki" to
+    # najczęstsze ustawienie, jakie ludzie wybierają.
+    music_volume: float = 0.25
 
     # Wejścia dla pól pochodnych. Suwaki w panelu Ustawienia sterują właśnie
     # nimi, a nie ring_shrink_speed czy ring_spawn_interval — te dwa są

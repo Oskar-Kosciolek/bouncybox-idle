@@ -25,7 +25,8 @@ from constants import PANEL_W, FPS, BG_COLOR
 from save_manager import save_game, load_game, delete_save
 from timestep import FixedTimestep
 from formatting import short_number
-from audio import Audio
+from audio import Audio, ring_tension
+from music import Music
 
 
 def update_dimensions(screen: pygame.Surface) -> tuple[int, int, int, int]:
@@ -101,6 +102,7 @@ def main() -> None:
     state = load_game() or GameState()
     config.apply_upgrades(state)
     audio = Audio(volume=config.sound_volume)
+    music = Music(volume=config.music_volume)   # wymaga miksera z Audio
     # Zegar do dławienia dźwięku odbić — liczony w czasie rzeczywistym
     game_time: float = 0.0
 
@@ -197,6 +199,13 @@ def main() -> None:
         dt = physics.step
         game_time += frame_dt
 
+        # Muzyka idzie za napięciem najbardziej wewnętrznego okręgu —
+        # ta sama informacja co wysokość odbić, ale w dłuższej skali czasu.
+        inner_ring = field.innermost()
+        tension = ring_tension(inner_ring.radius, config.ring_min_radius,
+                               config.ring_start_radius) if inner_ring else 0.0
+        music.update(frame_dt, state.wave, tension)
+
         autosave_timer += frame_dt
         if autosave_timer >= AUTOSAVE_INTERVAL:
             autosave_timer = 0.0
@@ -289,6 +298,7 @@ def main() -> None:
                 # albo awans fali.
                 config.apply_upgrades(state)
                 audio.volume = config.sound_volume
+                music.volume = config.music_volume
 
         # ----------------------------------------------------------------
         # Logika gry (zawsze w tle, niezależnie od aktywnej zakładki)
