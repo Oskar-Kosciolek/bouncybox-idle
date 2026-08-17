@@ -37,6 +37,17 @@ TIMBRES: dict[str, dict] = {
         "partials": ((1.0, 1.0, 2.0), (2.0, 0.30, 4.0),
                      (2.76, 0.20, 5.5), (5.4, 0.06, 9.0)),
     },
+    # Fortepian — miękkie uderzenie młoteczka i długo trzymająca podstawowa,
+    # nad którą górne składowe gasną kilka razy szybciej, więc barwa z czasem
+    # się ociepla. Mnożniki wyższych składowych są lekko podwyższone: struna
+    # ma sztywność, przez co jej alikwoty leżą nieco powyżej wielokrotności
+    # podstawowej. To ta rozstrojka odróżnia fortepian od piszczyka.
+    "pianino": {
+        "attack": 0.008,
+        "partials": ((1.00, 1.00, 1.3), (2.00, 0.55, 2.2),
+                     (3.01, 0.30, 3.2), (4.03, 0.16, 4.4),
+                     (5.06, 0.08, 6.0)),
+    },
 }
 
 
@@ -66,31 +77,34 @@ def note_bytes(freq: float, seconds: float, channels: int = 2,
     frames = int(SAMPLE_RATE * seconds)
     total_amp = sum(amp for _, amp, _ in partials) or 1.0
 
-    # Faza w obrotach i koperta liczone przyrostowo, po jednym mnożeniu
-    # na próbkę zamiast wywołania sin/exp.
-    phases = [0.0] * len(partials)
-    phase_steps = [freq * mult / SAMPLE_RATE for mult, _, _ in partials]
-    envelopes = [amp / total_amp for _, amp, _ in partials]
-    envelope_steps = [math.exp(-decay / SAMPLE_RATE)
-                      for _, _, decay in partials]
+    # Jeden przebieg na składową, wszystko na zmiennych lokalnych. Wersja
+    # przeplatająca składowe w jednej pętli indeksowała listy przy każdej
+    # próbce, co w Pythonie kosztuje więcej niż samo liczenie dźwięku.
+    acc = [0.0] * frames
+    sine, size, mask = _SINE, _SINE_SIZE, _SINE_MASK
+
+    for mult, amp, decay in partials:
+        # Każda składowa liczona tylko dopóki ją słychać. Górne gasną kilka
+        # razy szybciej niż podstawowa — piąta składowa fortepianu cichnie po
+        # 0,58 s, a nuta trwa 2,70 s, więc liczenie jej do końca to w czterech
+        # piątych generowanie zera.
+        span = min(frames, int(SAMPLE_RATE * _audible_seconds(decay)) + 1)
+        phase = 0.0
+        phase_step = freq * mult / SAMPLE_RATE
+        env = amp / total_amp
+        env_step = math.exp(-decay / SAMPLE_RATE)
+        for i in range(span):
+            acc[i] += env * sine[int(phase * size) & mask]
+            phase += phase_step
+            env *= env_step
 
     attack_frames = max(1, int(attack * SAMPLE_RATE))
-    count = len(partials)
-
-    # Bufor mono wypełniany po indeksie — `append` na milion próbek kosztuje
-    # więcej niż samo liczenie dźwięku.
     mono = array.array("h", bytes(frames * 2))
 
     for i in range(frames):
-        value = 0.0
-        for p in range(count):
-            value += envelopes[p] * _SINE[int(phases[p] * _SINE_SIZE) & _SINE_MASK]
-            phases[p] += phase_steps[p]
-            envelopes[p] *= envelope_steps[p]
-
+        value = acc[i]
         if i < attack_frames:
             value *= i / attack_frames
-
         mono[i] = int(max(-1.0, min(1.0, value)) * 32000)
 
     if channels == 1:
@@ -109,7 +123,7 @@ OCTAVES: int = 3
 NOTE_COUNT: int = len(SCALE_SEMITONES) * OCTAVES
 ROOT_HZ: float = 220.0
 
-NOTE_TIMBRE: str = "kalimba"
+NOTE_TIMBRE: str = "pianino"
 
 # Poniżej tego ułamka szczytu nuty już nie słychać — dalsze próbki to
 # generowanie ciszy. Przy sztywnych 1,6 s ostatnie pół sekundy kalimby
@@ -117,17 +131,30 @@ NOTE_TIMBRE: str = "kalimba"
 NOTE_SILENCE_THRESHOLD: float = 0.03
 
 
+def _audible_seconds(decay: float) -> float:
+    """Jak długo składowa o danym tempie gaśnięcia jest jeszcze słyszalna."""
+    return -math.log(NOTE_SILENCE_THRESHOLD) / decay
+
+
 def note_seconds(timbre: str) -> float:
-    """Ile nuta wybrzmiewa, zanim ucichnie poniżej progu słyszalności."""
+    """Ile nuta wybrzmiewa, zanim ucichnie poniżej progu słyszalności.
+
+    Decyduje najwolniej gasnąca składowa — to ona zostaje na końcu.
+    """
     slowest = min(decay for _, _, decay in TIMBRES[timbre]["partials"])
-    return -math.log(NOTE_SILENCE_THRESHOLD) / slowest
+    return _audible_seconds(slowest)
 
-BEAT_SLOW: float = 0.55        # odstęp między nutami na starcie
-BEAT_FAST: float = 0.30        # podłoga — bez niej wysokie fale terkoczą
-REST_CHANCE: float = 0.25      # pauzy dają oddech
+# Puls szybszy niż wybrzmienie nuty, więc nuty zachodzą na siebie i zamiast
+# pojedynczych uderzeń powstaje ciągła tkanka. To dlatego "szybciej" daje tu
+# spokojniejsze brzmienie, a nie bardziej urywane.
+BEAT_SLOW: float = 0.42        # odstęp między nutami na starcie
+BEAT_FAST: float = 0.24        # podłoga — bez niej wysokie fale terkoczą
+REST_CHANCE: float = 0.12      # rzadkie pauzy: przerwa ma być oddechem,
+                               # nie dziurą rwącą linię
 
+# Krok o jeden stopień dominuje — duże skoki brzmią nerwowo.
 _STEPS: tuple[int, ...] = (-2, -1, 0, 1, 2)
-_STEP_WEIGHTS: tuple[float, ...] = (1.0, 3.0, 1.5, 3.0, 1.0)
+_STEP_WEIGHTS: tuple[float, ...] = (0.5, 4.0, 1.2, 4.0, 0.5)
 
 # Siła ciągnąca melodię ku środkowi skali. Bez niej błądzenie losowe po
 # ograniczonym zakresie osiada na brzegach — wychodziło pięć nut pod rząd
