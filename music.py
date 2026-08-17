@@ -7,11 +7,100 @@ pauzami, którego tempo i kierunek idą za stanem gry. Nie ma czego zapamiętać
 więc nie ma się czym znudzić.
 """
 
+import array
+import math
 import random
 
 import pygame
 
-from audio import tone_bytes
+from audio import SAMPLE_RATE
+
+# Barwy nut. Każda składowa to (mnożnik częstotliwości, amplituda, tempo
+# gaśnięcia). Osobne tempo na składową jest tym, co odróżnia instrument od
+# piszczyka: w rzeczywistych instrumentach wyższe harmoniczne gasną szybciej,
+# a gdy gasną równo, brzmi to jak organy elektroniczne.
+TIMBRES: dict[str, dict] = {
+    # Kalimba / pozytywka — czysty atak, szybko gasnące wyższe składowe
+    "kalimba": {
+        "attack": 0.006,
+        "partials": ((1.0, 1.0, 3.0), (2.0, 0.5, 6.0),
+                     (3.0, 0.22, 9.0), (4.2, 0.10, 12.0)),
+    },
+    # Marimba / drewno — krótkie, matowe, mocna czwarta harmoniczna
+    "marimba": {
+        "attack": 0.003,
+        "partials": ((1.0, 1.0, 5.0), (4.0, 0.40, 14.0), (10.0, 0.08, 22.0)),
+    },
+    # Miękki dzwonek — długi ogon, lekko nieharmoniczne składowe
+    "dzwonek": {
+        "attack": 0.010,
+        "partials": ((1.0, 1.0, 2.0), (2.0, 0.30, 4.0),
+                     (2.76, 0.20, 5.5), (5.4, 0.06, 9.0)),
+    },
+}
+
+
+# Tablica sinusa. Naiwna pętla wołała `sin` i `exp` po dwa miliony razy na
+# komplet nut, co dawało 876 ms zawieszenia przy starcie gry. Odczyt z tablicy
+# i przyrostowe gaśnięcie zamieniają to na mnożenia.
+_SINE_BITS: int = 11
+_SINE_SIZE: int = 1 << _SINE_BITS
+_SINE_MASK: int = _SINE_SIZE - 1
+_SINE: tuple[float, ...] = tuple(
+    math.sin(2.0 * math.pi * i / _SINE_SIZE) for i in range(_SINE_SIZE))
+
+
+def note_bytes(freq: float, seconds: float, channels: int = 2,
+               timbre: str = "kalimba") -> bytes:
+    """Nuta z narastaniem i osobnym gaśnięciem każdej składowej.
+
+    Osobny generator od `tone_bytes`, bo efekty i nuty mają inne wymagania:
+    efekt ma uderzyć od razu, nuta ma być szarpnięta. Bez rampy narastania
+    początek nuty jest skokiem amplitudy, co ucho słyszy jako pstryknięcie —
+    i to właśnie ono robi z instrumentu piszczyk.
+    """
+    spec = TIMBRES[timbre]
+    attack = spec["attack"]
+    partials = spec["partials"]
+
+    frames = int(SAMPLE_RATE * seconds)
+    total_amp = sum(amp for _, amp, _ in partials) or 1.0
+
+    # Faza w obrotach i koperta liczone przyrostowo, po jednym mnożeniu
+    # na próbkę zamiast wywołania sin/exp.
+    phases = [0.0] * len(partials)
+    phase_steps = [freq * mult / SAMPLE_RATE for mult, _, _ in partials]
+    envelopes = [amp / total_amp for _, amp, _ in partials]
+    envelope_steps = [math.exp(-decay / SAMPLE_RATE)
+                      for _, _, decay in partials]
+
+    attack_frames = max(1, int(attack * SAMPLE_RATE))
+    count = len(partials)
+
+    # Bufor mono wypełniany po indeksie — `append` na milion próbek kosztuje
+    # więcej niż samo liczenie dźwięku.
+    mono = array.array("h", bytes(frames * 2))
+
+    for i in range(frames):
+        value = 0.0
+        for p in range(count):
+            value += envelopes[p] * _SINE[int(phases[p] * _SINE_SIZE) & _SINE_MASK]
+            phases[p] += phase_steps[p]
+            envelopes[p] *= envelope_steps[p]
+
+        if i < attack_frames:
+            value *= i / attack_frames
+
+        mono[i] = int(max(-1.0, min(1.0, value)) * 32000)
+
+    if channels == 1:
+        return mono.tobytes()
+
+    # Przeplatanie wycinkiem zamiast próbka po próbce
+    out = array.array("h", bytes(frames * channels * 2))
+    for channel in range(channels):
+        out[channel::channels] = mono
+    return out.tobytes()
 
 # Pentatonika molowa — w niej trudno zagrać fałsz, więc losowanie nie
 # wyprodukuje kakofonii.
@@ -20,8 +109,18 @@ OCTAVES: int = 3
 NOTE_COUNT: int = len(SCALE_SEMITONES) * OCTAVES
 ROOT_HZ: float = 220.0
 
-NOTE_SECONDS: float = 0.9      # długie wybrzmienie: nuty zachodzą jak pad
-NOTE_DECAY: float = 3.5
+NOTE_TIMBRE: str = "kalimba"
+
+# Poniżej tego ułamka szczytu nuty już nie słychać — dalsze próbki to
+# generowanie ciszy. Przy sztywnych 1,6 s ostatnie pół sekundy kalimby
+# schodziło do 4% amplitudy i kosztowało jedną trzecią czasu startu.
+NOTE_SILENCE_THRESHOLD: float = 0.03
+
+
+def note_seconds(timbre: str) -> float:
+    """Ile nuta wybrzmiewa, zanim ucichnie poniżej progu słyszalności."""
+    slowest = min(decay for _, _, decay in TIMBRES[timbre]["partials"])
+    return -math.log(NOTE_SILENCE_THRESHOLD) / slowest
 
 BEAT_SLOW: float = 0.55        # odstęp między nutami na starcie
 BEAT_FAST: float = 0.30        # podłoga — bez niej wysokie fale terkoczą
@@ -73,8 +172,10 @@ class Music:
     """
 
     def __init__(self, volume: float = 0.25,
-                 rng: random.Random | None = None) -> None:
+                 rng: random.Random | None = None,
+                 timbre: str = NOTE_TIMBRE) -> None:
         self.volume = volume
+        self.timbre = timbre
         self.available = False
         self._notes: list[pygame.mixer.Sound] = []
         self._degree = NOTE_COUNT // 2
@@ -90,14 +191,14 @@ class Music:
     def _build(self) -> None:
         """Generuje wszystkie nuty raz, przy starcie (~190 ms)."""
         channels = pygame.mixer.get_init()[2]
+        seconds = note_seconds(self.timbre)
         self._notes = []
         for octave in range(OCTAVES):
             for semitone in SCALE_SEMITONES:
                 freq = ROOT_HZ * 2.0 ** ((semitone + 12 * octave) / 12.0)
                 self._notes.append(pygame.mixer.Sound(
-                    buffer=tone_bytes(freq, NOTE_SECONDS, channels=channels,
-                                      decay=NOTE_DECAY,
-                                      harmonics=((1.0, 1.0), (2.0, 0.25)))))
+                    buffer=note_bytes(freq, seconds, channels=channels,
+                                      timbre=self.timbre)))
 
     def update(self, dt: float, wave: int, tension: float) -> None:
         """Woła się co klatkę; gra nutę, gdy minie odstęp."""

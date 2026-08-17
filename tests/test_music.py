@@ -5,7 +5,7 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
 import pygame  # noqa: E402
 
-from audio import ring_tension  # noqa: E402
+from audio import SAMPLE_RATE, ring_tension  # noqa: E402
 from music import (  # noqa: E402
     BEAT_FAST,
     BEAT_SLOW,
@@ -106,3 +106,41 @@ def test_melody_does_not_settle_on_the_edges_of_the_scale():
             total += 1
 
     assert stuck < total * 0.12
+
+
+def _samples(data: bytes) -> list[int]:
+    import array
+    values = array.array("h")
+    values.frombytes(data)
+    return list(values)
+
+
+def test_note_starts_quietly_instead_of_snapping_to_full_volume():
+    """Skok amplitudy na starcie ucho słyszy jako pstryknięcie i to ono robi
+    z instrumentu piszczyk. Rampa narastania trwa kilka milisekund."""
+    from music import note_bytes
+
+    data = _samples(note_bytes(440.0, 0.5, channels=1, timbre="kalimba"))
+    early = max(abs(v) for v in data[:20])
+    peak = max(abs(v) for v in data)
+
+    assert early < peak * 0.2
+
+
+def test_higher_partials_fade_faster_than_the_fundamental():
+    """Równo gasnące składowe brzmią jak organy elektroniczne. W instrumencie
+    wyższe harmoniczne znikają pierwsze i barwa się z czasem ociepla."""
+    from music import TIMBRES
+
+    for name, spec in TIMBRES.items():
+        decays = [decay for _, _, decay in spec["partials"]]
+        assert decays == sorted(decays), name
+        assert decays[-1] > decays[0], name
+
+
+def test_every_timbre_generates_a_playable_note():
+    from music import TIMBRES, note_bytes
+
+    for name in TIMBRES:
+        data = note_bytes(330.0, 0.3, channels=2, timbre=name)
+        assert len(data) == int(SAMPLE_RATE * 0.3) * 2 * 2
