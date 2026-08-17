@@ -82,6 +82,10 @@ class Config:
     # w sesji ~70-krotnie, a HP okręgu tylko ~7-krotnie.
     hole_damage_multiplier: int = 40
 
+    # Głośność dźwięków, 0.0 = wyciszenie. W grze zostawianej w tle na godziny
+    # brak wyciszenia jest wadą, nie brakiem funkcji.
+    sound_volume: float = 0.4
+
     # Wejścia dla pól pochodnych. Suwaki w panelu Ustawienia sterują właśnie
     # nimi, a nie ring_shrink_speed czy ring_spawn_interval — te dwa są
     # przeliczane przy każdym zakupie i awansie fali, więc wartość wpisana

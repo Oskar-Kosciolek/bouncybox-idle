@@ -19,6 +19,7 @@ _COL_BORDER  = (40,  40,  55)
 # przelicza je przy każdym zakupie i awansie fali, więc suwak na nich nic nie
 # trzymał. Sterujemy tu ich wejściami.
 _SLIDERS: list[tuple[str, str, float, float, bool]] = [
+    ("Glosnosc (0 = cisza)",    "sound_volume",           0.0,   1.0, True),
     ("Karencja zduszenia (s)",  "crush_grace",            0.0,  20.0, True),
     ("Dziura x obrazen",        "hole_damage_multiplier",  1.0, 100.0, False),
     ("Zwezanie na fale",        "shrink_per_wave",        0.0,  10.0, True),

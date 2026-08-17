@@ -25,6 +25,7 @@ from constants import PANEL_W, FPS, BG_COLOR
 from save_manager import save_game, load_game, delete_save
 from timestep import FixedTimestep
 from formatting import short_number
+from audio import Audio
 
 
 def update_dimensions(screen: pygame.Surface) -> tuple[int, int, int, int]:
@@ -63,8 +64,11 @@ def _sync_balls(balls: list[Ball], cx: float, cy: float,
 
 
 def _notify_achievements(newly_unlocked: list,
-                          notifications: NotificationSystem) -> None:
+                          notifications: NotificationSystem,
+                          audio: Audio | None = None) -> None:
     """Dodaje powiadomienia dla nowo odblokowanych osiągnięć."""
+    if newly_unlocked and audio is not None:
+        audio.achievement()
     for ach in newly_unlocked:
         if ach.reward_coins > 0:
             notifications.add(
@@ -96,6 +100,9 @@ def main() -> None:
     config = Config()
     state = load_game() or GameState()
     config.apply_upgrades(state)
+    audio = Audio(volume=config.sound_volume)
+    # Zegar do dławienia dźwięku odbić — liczony w czasie rzeczywistym
+    game_time: float = 0.0
 
     # Naliczenie za czas poza grą — powiadomienie dodajemy niżej, gdy
     # system powiadomień już istnieje.
@@ -147,7 +154,7 @@ def main() -> None:
                               color=(255, 150, 50), lifetime=4.0)
             # Sprawdź osiągnięcia prestige
             newly_unlocked = check_achievements(state)
-            _notify_achievements(newly_unlocked, notifications)
+            _notify_achievements(newly_unlocked, notifications, audio)
 
     def _apply_powerup_to_game(kind: str) -> None:
         """Stosuje natychmiastowy efekt power-upa na grę."""
@@ -188,6 +195,7 @@ def main() -> None:
         # dt       — stały krok fizyki (symulacja)
         frame_dt = clock.tick(FPS) / 1000.0
         dt = physics.step
+        game_time += frame_dt
 
         autosave_timer += frame_dt
         if autosave_timer >= AUTOSAVE_INTERVAL:
@@ -257,6 +265,7 @@ def main() -> None:
                 prev_hash = str(state.__dict__)
                 shop_view.handle_event(event, current_game_w, current_game_h)
                 if str(state.__dict__) != prev_hash:
+                    audio.purchase()
                     config.apply_upgrades(state)
                     # Aktualizuj radius już istniejących piłek
                     for b in balls:
@@ -265,7 +274,7 @@ def main() -> None:
                     balls = _sync_balls(balls, cx, cy, config, state)
                     # Sprawdź osiągnięcia po zakupie
                     newly_unlocked = check_achievements(state)
-                    _notify_achievements(newly_unlocked, notifications)
+                    _notify_achievements(newly_unlocked, notifications, audio)
 
             elif tab_bar.active == 3:
                 prestige_view.handle_event(event, do_prestige, current_game_w, current_game_h)
@@ -279,6 +288,7 @@ def main() -> None:
                 # razu, żeby zmiana była widoczna bez czekania na zakup
                 # albo awans fali.
                 config.apply_upgrades(state)
+                audio.volume = config.sound_volume
 
         # ----------------------------------------------------------------
         # Logika gry (zawsze w tle, niezależnie od aktywnej zakładki)
@@ -326,6 +336,7 @@ def main() -> None:
                 balls = _make_balls(cx, cy, config, state.upgrade_multi_ball + 1)
                 floating_texts = FloatingTextSystem()
                 crush_pause = CRUSH_PAUSE
+                audio.crush()
                 notifications.add(f"ZDUSZONY! Spadek na fale {state.wave}",
                                   color=(220, 80, 60), lifetime=3.0)
                 break
@@ -335,8 +346,18 @@ def main() -> None:
                 for ring in field.alive():
                     if ring.alive:
                         was_alive = ring.alive
+                        hp_before = ring.hp
                         collided = ring.check_collision(ball)
+                        # check_collision zwraca False i przy braku kolizji,
+                        # i przy przelocie przez dziurę — odróżnia je dopiero
+                        # spadek HP bez odbicia.
+                        if collided:
+                            audio.bounce(ring.radius, config.ring_min_radius,
+                                         config.ring_start_radius, now=game_time)
+                        elif ring.hp < hp_before:
+                            audio.hole_hit()
                         if was_alive and not ring.alive:
+                            audio.ring_destroyed()
                             # Okrąg zniszczony — ustal przyczynę
                             gold_mult = getattr(ring, "gold_multiplier", 1.0)
                             coins = state.on_ring_destroyed(
@@ -368,7 +389,7 @@ def main() -> None:
                             )
                             # Sprawdź osiągnięcia po zniszczeniu okręgu i awansie fali
                             newly_unlocked = check_achievements(state)
-                            _notify_achievements(newly_unlocked, notifications)
+                            _notify_achievements(newly_unlocked, notifications, audio)
                         if collided:
                             # Floating text — obrażenia w miejscu uderzenia
                             floating_texts.add(
@@ -385,6 +406,7 @@ def main() -> None:
             for ball in balls:
                 for kind in powerup_system.check_collisions(ball):
                     powerup_system.apply_effect(kind)
+                    audio.powerup()
                     _apply_powerup_to_game(kind)
 
             particles.update(dt)
