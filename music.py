@@ -123,7 +123,7 @@ OCTAVES: int = 3
 NOTE_COUNT: int = len(SCALE_SEMITONES) * OCTAVES
 ROOT_HZ: float = 220.0
 
-NOTE_TIMBRE: str = "pianino"
+NOTE_TIMBRE: str = "dzwonek"
 
 # Poniżej tego ułamka szczytu nuty już nie słychać — dalsze próbki to
 # generowanie ciszy. Przy sztywnych 1,6 s ostatnie pół sekundy kalimby
