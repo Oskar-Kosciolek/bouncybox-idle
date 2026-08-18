@@ -56,33 +56,33 @@ class ShopView:
     # ------------------------------------------------------------------
 
     def handle_event(self, event: pygame.event.Event,
-                     current_game_w: int, current_game_h: int) -> None:
-        """Obsługuje kliknięcia w przyciski gałęzi i zakupy ulepszeń."""
+                     current_game_w: int, current_game_h: int) -> bool:
+        """Obsługuje kliknięcia i przewijanie. Zwraca True, gdy coś kupiono."""
         self.rect = pygame.Rect(current_game_w, TAB_TOTAL_HEIGHT,
                                 PANEL_W, current_game_h - TAB_TOTAL_HEIGHT)
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            self._handle_click(event.pos)
-        elif event.type == pygame.MOUSEWHEEL:
-            if self.rect.collidepoint(pygame.mouse.get_pos()):
-                self._scroll(event.y * -20)
+            return self._handle_click(event.pos)
+        if event.type == pygame.MOUSEWHEEL:
+            self._scroll(event.y * -20)
+        return False
 
-    def _handle_click(self, pos: tuple[int, int]) -> None:
-        """Obsługuje kliknięcie LPM w dowolnym miejscu widoku."""
+    def _handle_click(self, pos: tuple[int, int]) -> bool:
+        """Obsługuje kliknięcie LPM. Zwraca True, gdy doszło do zakupu."""
         # Przyciski gałęzi
         for i, branch in enumerate(_BRANCH_ORDER):
             btn = self._branch_btn_rect(i)
             if btn.collidepoint(pos):
                 self.active_branch = branch
                 self.scroll = 0
-                return
+                return False
 
         # Przyciski "Kup"
         filtered = self._filtered_upgrades()
         for j, upg in enumerate(filtered):
             buy_rect = self._buy_btn_rect(j)
             if buy_rect and buy_rect.collidepoint(pos):
-                upg.purchase(self.state)
-                return
+                return upg.purchase(self.state)
+        return False
 
     # ------------------------------------------------------------------
     # Rysowanie

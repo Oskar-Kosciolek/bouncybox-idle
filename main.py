@@ -158,6 +158,23 @@ def main() -> None:
             newly_unlocked = check_achievements(state)
             _notify_achievements(newly_unlocked, notifications, audio)
 
+    def after_purchase() -> None:
+        """Wspólne skutki zakupu ulepszenia — z Sklepu albo z Drzewka.
+
+        Zakup wykrywany jest teraz przez zwracaną wartość `handle_event`.
+        Wcześniej main.py porównywał `str(state.__dict__)` przed i po każdym
+        zdarzeniu myszy, co budowało tekst całego stanu kilkadziesiąt razy
+        na sekundę — i trzeba by to zdublować dla drugiego widoku.
+        """
+        nonlocal balls
+        audio.purchase()
+        config.apply_upgrades(state)
+        for ball in balls:
+            ball.radius = config.ball_radius
+        balls = _sync_balls(balls, cx, cy, config, state)
+        newly_unlocked = check_achievements(state)
+        _notify_achievements(newly_unlocked, notifications, audio)
+
     def _apply_powerup_to_game(kind: str) -> None:
         """Stosuje natychmiastowy efekt power-upa na grę."""
         nonlocal balls
@@ -270,20 +287,12 @@ def main() -> None:
             tab_bar.handle_event(event, current_game_w)
 
             if tab_bar.active == 1:
-                # Sklep — śledź zmiany stanu po zdarzeniu
-                prev_hash = str(state.__dict__)
-                shop_view.handle_event(event, current_game_w, current_game_h)
-                if str(state.__dict__) != prev_hash:
-                    audio.purchase()
-                    config.apply_upgrades(state)
-                    # Aktualizuj radius już istniejących piłek
-                    for b in balls:
-                        b.radius = config.ball_radius
-                    # Dospawnuj piłki jeśli multi_ball wzrósł
-                    balls = _sync_balls(balls, cx, cy, config, state)
-                    # Sprawdź osiągnięcia po zakupie
-                    newly_unlocked = check_achievements(state)
-                    _notify_achievements(newly_unlocked, notifications, audio)
+                if shop_view.handle_event(event, current_game_w, current_game_h):
+                    after_purchase()
+
+            elif tab_bar.active == 2:
+                if tree_view.handle_event(event, current_game_w, current_game_h):
+                    after_purchase()
 
             elif tab_bar.active == 3:
                 prestige_view.handle_event(event, do_prestige, current_game_w, current_game_h)
