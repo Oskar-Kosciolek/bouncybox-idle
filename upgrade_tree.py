@@ -5,6 +5,29 @@ if TYPE_CHECKING:
     from game_state import GameState
 
 
+# Zmierzony przychód na minutę w momencie, w którym gracz faktycznie kupuje
+# daną warstwę: warstwę 1 podczas bootstrapu, warstwę 2 koło fali 10,
+# warstwę 3 koło fali 25. Kotwica jest przychodem, nie wypłatą za okrąg —
+# od fali 10 gracz zbiera ~430 okręgów na minutę i ta liczba się wypłaszcza,
+# ale między falą 1 a 10 podwaja się, więc sama wypłata zaniżyłaby warstwę 1
+# dwukrotnie względem reszty drzewka.
+INCOME_AT_UNLOCK: dict[int, float] = {1: 150.0, 10: 15_000.0, 25: 90_000.0}
+
+
+def _validate_unlock_waves(upgrades: list["Upgrade"]) -> None:
+    """Sprawdza, że każda warstwa ma kotwicę kosztu.
+
+    Wołane przy imporcie modułu, nie przy pierwszym zakupie — ulepszenie
+    z nieznaną falą odblokowania rzuciłoby KeyError dopiero wtedy, gdy gracz
+    kliknie węzeł, czyli po godzinie gry.
+    """
+    for upg in upgrades:
+        if upg.unlock_wave not in INCOME_AT_UNLOCK:
+            raise ValueError(
+                f"{upg.id}: unlock_wave={upg.unlock_wave} nie ma kotwicy "
+                f"w INCOME_AT_UNLOCK (dozwolone: {sorted(INCOME_AT_UNLOCK)})")
+
+
 @dataclass
 class Upgrade:
     id: str
@@ -12,9 +35,20 @@ class Upgrade:
     description: str
     branch: str           # "ball" | "rings" | "economy"
     max_level: Optional[int]   # None = bez sufitu poziomów
-    base_cost: float      # koszt pierwszego poziomu
+    cost_minutes: float   # ile minut gry ma kosztować pierwszy poziom
     cost_multiplier: float = 2.0  # każdy poziom droższy x razy
     requires: Optional[str] = None   # id innego upgrade który musi być > 0
+    unlock_wave: int = 1   # warstwa: 1, 10 albo 25
+
+    @property
+    def base_cost(self) -> float:
+        """Koszt pierwszego poziomu w monetach.
+
+        Liczony, nie wpisany: stała w kodzie nie wie nic o ekonomii, która
+        rośnie wykładniczo z falą, więc rozjeżdżała się przy każdej zmianie
+        wypłaty. Minuta gry znaczy to samo na fali 1 i na fali 25.
+        """
+        return self.cost_minutes * INCOME_AT_UNLOCK[self.unlock_wave]
 
     def cost_at_level(self, current_level: int) -> float:
         """Zwraca koszt zakupu następnego poziomu (od current_level do current_level+1)."""
@@ -96,23 +130,26 @@ PRESTIGE_UPGRADES: list[PrestigeUpgrade] = [
 
 UPGRADES: list[Upgrade] = [
     # Gałąź: Piłka
-    Upgrade("ball_speed",    "Prędkość piłki",    "+20% prędkości",            "ball",    5, 50.0),
-    Upgrade("ball_size",     "Rozmiar piłki",     "Większa piłka = łatwiej",   "ball",    3, 80.0,  requires="ball_speed"),
-    Upgrade("multi_ball",    "Multi-ball",        "Dodatkowa piłka na planszy", "ball",   2, 300.0, requires="ball_speed"),
-    Upgrade("ball_trail",    "Smuga",             "Efekt wizualny smugi",       "ball",   1, 150.0, requires="ball_speed"),
+    Upgrade("ball_speed",  "Predkosc pilki", "+20% predkosci",             "ball", 5, 0.333),
+    Upgrade("ball_size",   "Rozmiar pilki",  "Wieksza pilka = latwiej",    "ball", 3, 0.533, requires="ball_speed"),
+    Upgrade("multi_ball",  "Multi-ball",     "Dodatkowa pilka na planszy", "ball", 3, 2.0,   requires="ball_speed"),
+    Upgrade("ball_trail",  "Smuga",          "Efekt wizualny smugi",       "ball", 1, 1.0,   requires="ball_speed"),
     # Bez sufitu — ujście dla monet po wyczerpaniu reszty drzewka. Efekt mnożny,
     # bo HP okręgu rośnie liniowo z falą, a przy koszcie wykładniczym dodawanie
     # stałej dawałoby wzrost logarytmiczny, który nigdy by nie nadążył.
-    Upgrade("ball_damage",   "Sila uderzenia",    "+25% obrazen za poziom",     "ball", None, 200.0, cost_multiplier=1.6, requires="ball_speed"),
+    Upgrade("ball_damage", "Sila uderzenia", "+25% obrazen za poziom",     "ball", None, 1.333,
+            cost_multiplier=1.6, requires="ball_speed"),
 
     # Gałąź: Okręgi
-    Upgrade("hole_size",     "Rozmiar dziury",    "+10° rozmiar dziury",        "rings",  5, 60.0),
-    Upgrade("hole_count",    "Liczba dziur",      "+1 dziura w okręgu",         "rings",  3, 120.0, requires="hole_size"),
-    Upgrade("hole_speed",    "Ruch dziury",       "Dziury się obracają",        "rings",  3, 100.0, requires="hole_size"),
-    Upgrade("explosion",     "Eksplozja",         "+monety za zniszczenie",     "rings",  3, 80.0),
+    Upgrade("hole_size",  "Rozmiar dziury", "+10 stopni rozmiaru dziury", "rings", 5, 0.4),
+    Upgrade("hole_count", "Liczba dziur",   "+1 dziura w okregu",         "rings", 3, 0.8,   requires="hole_size"),
+    Upgrade("hole_speed", "Ruch dziury",    "Dziury sie obracaja",        "rings", 3, 0.667, requires="hole_size"),
+    Upgrade("explosion",  "Eksplozja",      "+monety za zniszczenie",     "rings", 3, 0.533),
 
     # Gałąź: Ekonomia
-    Upgrade("coin_multiplier", "Mnożnik monet",   "+50% monet za okrąg",        "economy", 5, 100.0),
-    Upgrade("auto_collector",  "Auto-kolektor",   "Monety same wpadają",        "economy", 1, 500.0, requires="coin_multiplier"),
-    Upgrade("coins_on_bounce", "Monety za odbicie", "+0.5 monet za odbicie",    "economy", 3, 150.0, requires="coin_multiplier"),
+    Upgrade("coin_multiplier", "Mnoznik monet",     "+50% monet za okrag",  "economy", 5, 0.667),
+    Upgrade("auto_collector",  "Auto-kolektor",     "Monety same wpadaja",  "economy", 1, 3.333, requires="coin_multiplier"),
+    Upgrade("coins_on_bounce", "Monety za odbicie", "+1% wyplaty za odbicie", "economy", 3, 1.0, requires="coin_multiplier"),
 ]
+
+_validate_unlock_waves(UPGRADES)
