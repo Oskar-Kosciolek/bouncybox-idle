@@ -156,3 +156,56 @@ def test_offline_cannot_be_claimed_twice():
     _, second = state.claim_offline(now=1000.0 + HOUR)
 
     assert second == 0.0
+
+
+def test_ring_hp_grows_exponentially_with_the_wave():
+    """HP rosło liniowo (8x przez sesję), a obrażenia wykładniczo (87x), więc
+    cios dziury przerastał każdy okrąg i typy przestawały się różnić."""
+    ratios = [GameState(wave=w + 1).get_ring_hp() / GameState(wave=w).get_ring_hp()
+              for w in (5, 20, 50)]
+
+    assert all(abs(r - ratios[0]) < 0.01 for r in ratios)
+    assert ratios[0] > 1.05
+
+
+def test_ring_hp_is_unchanged_on_the_first_wave():
+    assert GameState(wave=1).get_ring_hp() == 100
+
+
+def test_payout_grows_at_the_same_rate_as_ring_hp():
+    """Różne tempa rozjechałyby ekonomię: twardsze okręgi za tę samą stawkę
+    znaczą, że każda kolejna fala opłaca się mniej."""
+    hp_ratio = GameState(wave=21).get_ring_hp() / GameState(wave=20).get_ring_hp()
+    pay_ratio = GameState(wave=21).ring_payout() / GameState(wave=20).ring_payout()
+
+    assert abs(hp_ratio - pay_ratio) < 0.01
+
+
+def test_destroying_a_ring_pays_the_wave_payout():
+    """Jedna formuła wypłaty dla zniszczenia i dla offline — dwie niezależne
+    właśnie dlatego się rozjechały."""
+    state = GameState(wave=12)
+
+    coins = state.on_ring_destroyed()
+
+    assert coins == state.ring_payout()
+
+
+def test_offline_rate_follows_the_payout_curve():
+    """Stawka liniowa przy wykładniczych monetach dawała 274% zarobku
+    aktywnego na fali 10 i 3,7% na fali 70."""
+    low = GameState(wave=10, last_played_at=1000.0)
+    high = GameState(wave=40, last_played_at=1000.0)
+
+    _, low_coins = low.offline_earnings(now=1000.0 + HOUR)
+    _, high_coins = high.offline_earnings(now=1000.0 + HOUR)
+
+    assert abs(high_coins / low_coins
+               - high.ring_payout() / low.ring_payout()) < 0.01
+
+
+def test_offline_never_pays_more_than_destroying_rings_by_hand():
+    """Stawka offline to ułamek okręgu na sekundę — musi zostać ułamkiem."""
+    from game_state import OFFLINE_RINGS_PER_SECOND
+
+    assert 0.0 < OFFLINE_RINGS_PER_SECOND < 0.3

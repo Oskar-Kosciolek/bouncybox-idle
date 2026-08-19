@@ -2,8 +2,23 @@ from dataclasses import dataclass, field
 
 # Naliczanie za czas poza grą.
 OFFLINE_CAP_SECONDS: float = 8 * 3600.0
-OFFLINE_RATE_PER_WAVE: float = 2.0          # ~1/3 tempa zarabiania w grze
 AUTO_COLLECTOR_OFFLINE_BONUS: float = 2.0
+
+# Ile okręgów na sekundę "niszczy" gracz podczas nieobecności. Stawka liczona
+# jako ułamek okręgu, a nie stała liczba monet, bo wypłata rośnie wykładniczo
+# z falą — liniowa stawka dawała 274% zarobku aktywnego na fali 10 i 3,7%
+# na fali 70. Zmierzone tempo aktywne to 0,42 okręgu/s na niskich falach
+# i 0,08 na wysokich, więc 0,06 zostaje ułamkiem na całej rozpiętości.
+OFFLINE_RINGS_PER_SECOND: float = 0.06
+
+# HP okręgu i wypłata rosną wykładniczo, tym samym tempem. Wykładniczo, bo
+# obrażenia piłki też rosną wykładniczo z poziomem ulepszenia — przy HP
+# liniowym cios dziury przerastał każdy okrąg i wszystkie typy ginęły od
+# jednego trafienia. Tym samym tempem, bo inaczej wysiłek na monetę
+# zmieniałby się z falą i ekonomia rozjechałaby się razem z trudnością.
+RING_HP_BASE: float = 100.0
+RING_PAYOUT_BASE: float = 15.0
+WAVE_GROWTH: float = 1.11
 
 
 @dataclass
@@ -127,7 +142,7 @@ class GameState:
         """
         self.rings_destroyed += 1
         self.rings_destroyed_this_wave += 1
-        base_coins = 10.0 + self.wave * 5.0
+        base_coins = self.ring_payout()
         explosion_bonus = 1.0 + self.upgrade_explosion * 0.3
         coins = base_coins * explosion_bonus * gold_multiplier * type_multiplier
         self.add_coins(coins)
@@ -163,7 +178,7 @@ class GameState:
             return 0.0, 0.0
 
         elapsed = min(elapsed, OFFLINE_CAP_SECONDS)
-        rate = self.wave * OFFLINE_RATE_PER_WAVE
+        rate = OFFLINE_RINGS_PER_SECOND * self.ring_payout()
         if self.upgrade_auto_collector > 0:
             rate *= AUTO_COLLECTOR_OFFLINE_BONUS
         return elapsed, rate * elapsed
@@ -180,8 +195,16 @@ class GameState:
         return elapsed, coins
 
     def get_ring_hp(self) -> int:
-        """Startowe HP okręgu = 100, rośnie o 15 za każdą falę."""
-        return 100 + (self.wave - 1) * 15
+        """HP okręgu na bieżącej fali."""
+        return max(1, int(RING_HP_BASE * WAVE_GROWTH ** (self.wave - 1)))
+
+    def ring_payout(self) -> float:
+        """Bazowa wypłata za okrąg na bieżącej fali, przed mnożnikami.
+
+        Jedna formuła dla zniszczenia okręgu i dla naliczania offline —
+        dwie niezależne właśnie dlatego się rozjechały.
+        """
+        return RING_PAYOUT_BASE * WAVE_GROWTH ** (self.wave - 1)
 
     def check_wave_progress(self) -> bool:
         """Zwraca True jeśli awansowano na nową falę."""
