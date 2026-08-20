@@ -33,7 +33,7 @@ class GameState:
     # Gałąź: Piłka
     upgrade_ball_speed: int = 0       # max 5
     upgrade_ball_size: int = 0        # max 3
-    upgrade_multi_ball: int = 0       # max 2 (0=1 piłka, 1=2 piłki, 2=3 piłki)
+    upgrade_multi_ball: int = 0       # max 3 (0=1 piłka, 3=4 piłki)
     upgrade_ball_trail: int = 0       # max 1
     upgrade_ball_damage: int = 0      # bez sufitu — ujście dla monet
 
