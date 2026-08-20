@@ -209,3 +209,54 @@ def test_offline_never_pays_more_than_destroying_rings_by_hand():
     from game_state import OFFLINE_RINGS_PER_SECOND
 
     assert 0.0 < OFFLINE_RINGS_PER_SECOND < 0.3
+
+
+# ----------------------------------------------------------------------
+# Monety za odbicie
+# ----------------------------------------------------------------------
+
+def test_a_bounce_pays_one_coin_per_level():
+    state = GameState(upgrade_coins_on_bounce=1)
+
+    state.on_bounce()
+
+    assert state.coins == 1.0
+
+
+def test_bounce_pay_scales_with_the_level():
+    state = GameState(upgrade_coins_on_bounce=3)
+
+    state.on_bounce()
+
+    assert state.coins == 3.0
+
+
+def test_without_the_upgrade_a_bounce_pays_nothing():
+    state = GameState(upgrade_coins_on_bounce=0)
+
+    state.on_bounce()
+
+    assert state.coins == 0.0
+
+
+def test_bounce_pay_still_goes_through_the_coin_multiplier():
+    """Odbicie płaci przez add_coins, więc mnożnik monet działa i tutaj —
+    '+1 moneta' to wartość bazowa, nie sufit."""
+    state = GameState(upgrade_coins_on_bounce=1, upgrade_coin_multiplier=2)
+
+    state.on_bounce()
+
+    assert state.coins == 2.0
+
+
+def test_the_upgrade_description_states_what_a_bounce_actually_pays():
+    """Opis mówił '+1% wyplaty za odbicie', gdy kod płacił stałe 0,5 —
+    wyprzedził implementację o cały etap planu i nikt tego nie złapał,
+    bo opisu nie sprawdzał żaden test."""
+    from upgrade_tree import UPGRADES
+
+    upg = next(u for u in UPGRADES if u.id == "coins_on_bounce")
+    state = GameState(upgrade_coins_on_bounce=1)
+    state.on_bounce()
+
+    assert f"+{int(state.coins)} monet" in upg.description

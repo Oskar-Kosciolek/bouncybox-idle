@@ -149,7 +149,7 @@ UPGRADES: list[Upgrade] = [
     # Gałąź: Ekonomia
     Upgrade("coin_multiplier", "Mnoznik monet",     "+50% monet za okrag",  "economy", 5, 0.667),
     Upgrade("auto_collector",  "Auto-kolektor",     "Monety same wpadaja",  "economy", 1, 3.333, requires="coin_multiplier"),
-    Upgrade("coins_on_bounce", "Monety za odbicie", "+1% wyplaty za odbicie", "economy", 3, 1.0, requires="coin_multiplier"),
+    Upgrade("coins_on_bounce", "Monety za odbicie", "+1 moneta za odbicie", "economy", 3, 1.0, requires="coin_multiplier"),
 ]
 
 _validate_unlock_waves(UPGRADES)

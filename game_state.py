@@ -149,9 +149,14 @@ class GameState:
         return coins
 
     def on_bounce(self) -> None:
-        """Wywołaj przy każdym odbiciu jeśli upgrade_coins_on_bounce > 0."""
+        """Wywołaj przy każdym odbiciu jeśli upgrade_coins_on_bounce > 0.
+
+        Stała moneta na poziom, nie ułamek wypłaty za okrąg: odbicia są
+        gęste i wczesne, więc ulepszenie ma dawać odczuwalny zastrzyk od
+        pierwszego poziomu, zamiast skalować się razem z falą.
+        """
         if self.upgrade_coins_on_bounce > 0:
-            self.add_coins(self.upgrade_coins_on_bounce * 0.5)
+            self.add_coins(float(self.upgrade_coins_on_bounce))
 
     def on_crushed(self) -> None:
         """Wywołaj gdy stos okręgów dociśnie piłkę.
