@@ -23,6 +23,7 @@ from ui.floating_text import FloatingTextSystem
 from confirm import ConfirmedAction
 from constants import PANEL_W, FPS, BG_COLOR
 from save_manager import save_game, load_game, delete_save
+from settings_store import load_settings, save_settings
 from timestep import FixedTimestep
 from formatting import short_number
 from audio import Audio, ring_tension
@@ -99,6 +100,9 @@ def main() -> None:
     crush_font = pygame.font.SysFont("segoeui", 40, bold=True)
 
     config = Config()
+    # Przed Audio i Music, bo obie biorą głośność w konstruktorze — wczytanie
+    # po nich puszczałoby pierwszy dźwięk na domyślnym regulatorze.
+    load_settings(config)
     state = load_game() or GameState()
     config.apply_upgrades(state)
     audio = Audio(volume=config.sound_volume)
@@ -156,6 +160,15 @@ def main() -> None:
             # Sprawdź osiągnięcia prestige
             newly_unlocked = check_achievements(state)
             _notify_achievements(newly_unlocked, notifications, audio)
+
+    def save_user_settings() -> None:
+        """Zapisuje preferencje gracza po puszczeniu suwaka.
+
+        Osobny plik od zapisu gry: RESET WSZYSTKIEGO kasuje postęp, a nie
+        ustawienia — po wyczyszczeniu gry muzyka nie ma wracać na domyślny
+        regulator.
+        """
+        save_settings(config)
 
     def manual_save() -> None:
         """Ręczny zapis — z F5 albo z przycisku w panelu Gry."""
@@ -325,8 +338,9 @@ def main() -> None:
                 achievements_view.handle_event(event, current_game_w, current_game_h)
 
             elif tab_bar.active == 4:
-                settings_view.handle_event(event, config, current_game_w,
-                                           current_game_h)
+                settings_view.handle_event(event, config,
+                                           save_user_settings,
+                                           current_game_w, current_game_h)
                 # Suwaki sterują wejściami pól pochodnych — przeliczamy od
                 # razu, żeby zmiana była widoczna bez czekania na zakup
                 # albo awans fali.

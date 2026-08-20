@@ -74,6 +74,10 @@ je gasi.
 
 Gra zapisuje się sama co 30 sekund do `save.json` obok plików gry.
 
+Głośność efektów i muzyki (zakładka **Ustawienia**, sekcja *Dzwiek*) idzie do
+osobnego `settings.json`, zapisywanego po puszczeniu suwaka. Twardy reset kasuje
+`save.json`, ale ustawień nie rusza — głośność to preferencja, nie postęp.
+
 ## Struktura kodu
 
 | Warstwa | Pliki | Zależność od pygame |

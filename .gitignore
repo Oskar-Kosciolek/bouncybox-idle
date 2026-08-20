@@ -172,6 +172,7 @@ pyrightconfig.json
 
 # Zapis gry i jego pliki poboczne
 save.json
+settings.json
 save.json.tmp
 save.json.corrupt
 .superpowers/

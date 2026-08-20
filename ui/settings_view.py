@@ -1,5 +1,5 @@
 import pygame
-from typing import TYPE_CHECKING
+from typing import Callable, TYPE_CHECKING
 
 from constants import PANEL_W
 from ui.tab_bar import TAB_TOTAL_HEIGHT
@@ -13,6 +13,7 @@ _COL_VALUE   = (220, 200,  80)
 _COL_BAR_BG  = (40,  40,  55)
 _COL_BAR_FG  = (80, 140, 220)
 _COL_BORDER  = (40,  40,  55)
+_COL_SECTION = (120, 120, 160)
 
 # (etykieta, pole w Config, min, max, czy_float)
 # Uwaga: ring_shrink_speed i ring_spawn_interval są POCHODNE — apply_upgrades
@@ -42,6 +43,24 @@ _SLIDERS: list[tuple[str, str, float, float, bool]] = [
 _ROW_H = 54   # wysokość jednego wiersza suwaka
 _BAR_H = 10   # wysokość paska suwaka
 _PAD   = 10   # padding poziomy
+_HDR_H = 24   # wysokość nagłówka sekcji
+
+# Nagłówek rysowany NAD wierszem o danym indeksie. Głośność idzie pierwsza
+# i osobno, bo należy do gracza — reszta to pokrętła do strojenia balansu,
+# nieodróżnialne dla kogoś, kto chce tylko ściszyć muzykę.
+_SECTIONS: dict[int, str] = {
+    0: "Dzwiek",
+    2: "Gra (dev)",
+}
+
+
+def _headers_above(index: int) -> int:
+    """Ile nagłówków sekcji leży nad wierszem o tym indeksie."""
+    return sum(1 for i in _SECTIONS if i <= index)
+
+
+def _content_height() -> int:
+    return len(_SLIDERS) * _ROW_H + len(_SECTIONS) * _HDR_H
 
 
 class SettingsView:
@@ -61,11 +80,12 @@ class SettingsView:
     # ------------------------------------------------------------------
 
     def handle_event(self, event: pygame.event.Event, config: "Config",
+                     on_change: Callable[[], None],
                      current_game_w: int, current_game_h: int) -> None:
         self._set_rect(current_game_w, current_game_h)
         if event.type == pygame.MOUSEWHEEL:
             self.scroll -= event.y * 20
-            max_scroll = max(0.0, len(_SLIDERS) * _ROW_H - self.rect.height + 30)
+            max_scroll = max(0.0, _content_height() - self.rect.height + 30)
             self.scroll = max(0.0, min(self.scroll, max_scroll))
 
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -76,6 +96,11 @@ class SettingsView:
                     self._set_value_from_x(i, event.pos[0], config)
 
         elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+            # Zapis dopiero po puszczeniu suwaka: przeciąganie sypie
+            # zdarzeniami co klatkę, więc zapis na MOUSEMOTION znaczyłby
+            # kilkadziesiąt zapisów pliku na sekundę.
+            if self._dragging is not None:
+                on_change()
             self._dragging = None
 
         elif event.type == pygame.MOUSEMOTION:
@@ -106,15 +131,16 @@ class SettingsView:
         old_clip = surface.get_clip()
         surface.set_clip(self.rect)
 
-        header = font.render("Ustawienia (dev)", True, (120, 120, 160))
-        surface.blit(header, (self.rect.x + _PAD, self.rect.y + 6))
-
         for i, (label, field, vmin, vmax, is_float) in enumerate(_SLIDERS):
-            row_y = self.rect.y + 30 + i * _ROW_H - int(self.scroll)
+            row_y = self._row_y(i)
 
             # Pomiń wiersze całkowicie poza widocznym obszarem
             if row_y + _ROW_H < self.rect.y or row_y > self.rect.bottom:
                 continue
+
+            if i in _SECTIONS:
+                hdr = font.render(_SECTIONS[i], True, _COL_SECTION)
+                surface.blit(hdr, (self.rect.x + _PAD, row_y - _HDR_H))
 
             current = getattr(config, field)
 
@@ -146,9 +172,15 @@ class SettingsView:
     # Pomocnicze
     # ------------------------------------------------------------------
 
+    def _row_y(self, index: int) -> int:
+        """Górna krawędź wiersza. Jedyne miejsce, które zna ten wzór —
+        rysowanie i trafianie w suwak muszą liczyć go tak samo, bo obraz
+        wygląda poprawnie także wtedy, gdy klikanie trafia obok.
+        """
+        return (self.rect.y + 6 + _headers_above(index) * _HDR_H
+                + index * _ROW_H - int(self.scroll))
+
     def _bar_rect(self, index: int) -> pygame.Rect:
         """Prostokąt paska suwaka dla danego indeksu (z uwzględnieniem scrolla)."""
-        row_y = self.rect.y + 30 + index * _ROW_H - int(self.scroll)
-        bar_y = row_y + 20
-        return pygame.Rect(self.rect.x + _PAD, bar_y,
+        return pygame.Rect(self.rect.x + _PAD, self._row_y(index) + 20,
                            self.rect.width - _PAD * 2, _BAR_H)
