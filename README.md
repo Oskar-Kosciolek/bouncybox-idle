@@ -52,16 +52,21 @@ jednej trzeciej zarobku w trakcie grania (dwukrotnie więcej z auto-kolektorem).
 
 ## Sterowanie
 
-Panel po prawej ma sześć zakładek: **Gra**, **Sklep**, **Drzewko**,
-**Prestige**, **Osiągnięcia**, **Ustawienia**. Ulepszenia da się kupować
-zarówno w Sklepie, jak i klikając węzły w Drzewku.
+Panel po prawej ma pięć zakładek: **Gra**, **Drzewko**, **Prestige**,
+**Osiągnięcia**, **Ustawienia**. Zakładka Gra powtarza tę ściągę na ekranie.
+Ulepszenia kupuje się w Drzewku — klikając węzeł albo przycisk **Kup** w pasku
+szczegółów, który po najechaniu pokazuje opis, poziom i cenę.
 
 | Klawisz | Działanie |
 |---|---|
 | `ESC` | zapis i wyjście |
 | `R` | nowa runda — zachowuje monety, ulepszenia i falę |
 | `F5` | ręczny zapis |
-| `F6` | kasuje zapis i zaczyna od zera |
+| `F6` | twardy reset — kasuje zapis i zaczyna od zera |
+
+`F6` wymaga dwóch wciśnięć w ciągu trzech sekund; pierwsze tylko uzbraja.
+To samo potwierdzenie ma przycisk **RESET WSZYSTKIEGO** na dole zakładki
+Ustawienia — obie drogi dzielą jedno okno czasowe.
 
 Gra zapisuje się sama co 30 sekund do `save.json` obok plików gry.
 

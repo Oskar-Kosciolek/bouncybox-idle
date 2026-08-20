@@ -14,5 +14,4 @@ def test_main_dispatches_every_tab_that_the_bar_shows():
 
     handled = {int(n) for n in re.findall(r"tab_bar\.active == (\d+)", src)}
 
-    # Zakładka 0 (Gra) to sam HUD — nie ma panelu, więc main.py jej nie łapie.
-    assert handled == set(range(1, len(TabBar.TABS)))
+    assert handled == set(range(len(TabBar.TABS)))

@@ -1,7 +1,9 @@
 import pygame
 from typing import TYPE_CHECKING
 
+from constants import PANEL_W
 from formatting import short_number
+from ui.tab_bar import TAB_TOTAL_HEIGHT
 
 if TYPE_CHECKING:
     from game_state import GameState
@@ -13,13 +15,77 @@ _COL_WAVE      = (100, 180, 255)
 _COL_BAR_BG    = (40, 40, 55)
 _COL_BAR_FILL  = (80, 180, 100)
 _COL_BAR_FULL  = (100, 220, 120)
+_COL_PANEL_BG  = (24, 24, 32)
+_COL_HEADER    = (120, 120, 160)
+_COL_KEY       = (220, 200, 80)
+_COL_HINT      = (140, 140, 160)
 
 
 class GameView:
-    """Nakładka HUD rysowana w obszarze gry."""
+    """Zakładka Gra: nakładka HUD nad planszą i ściąga w panelu obok."""
+
+    # Skróty klawiszowe. Trzymane jako dane, nie wklejone w rysowanie, bo
+    # test pilnuje, że pokrywają się z tabelą w README — a README już raz
+    # przeżył usunięcie całej zakładki, nic o tym nie wiedząc.
+    CONTROLS: list[tuple[str, str]] = [
+        ("ESC", "zapis i wyjscie"),
+        ("R",   "nowa runda"),
+        ("F5",  "reczny zapis"),
+        ("F6",  "twardy reset"),
+    ]
+
+    # Panel ma 180 px, więc każda linia jest łamana ręcznie — automatyczne
+    # zawijanie dla czterech zdań byłoby droższe niż same zdania.
+    HINTS: list[str] = [
+        "Klik w wezel drzewka",
+        "kupuje jeden poziom.",
+        "",
+        "Najedz kursorem, zeby",
+        "zobaczyc opis i cene.",
+        "",
+        "Reset jest tez na dole",
+        "zakladki Ustawienia.",
+    ]
 
     def __init__(self) -> None:
         pass
+
+    def draw_controls(self, surface: pygame.Surface,
+                      font: pygame.font.Font,
+                      current_game_w: int,
+                      current_game_h: int) -> None:
+        """Rysuje ściągę w panelu — zakładka Gra nie miała tam nic."""
+        rect = pygame.Rect(current_game_w, TAB_TOTAL_HEIGHT,
+                           PANEL_W, current_game_h - TAB_TOTAL_HEIGHT)
+        pygame.draw.rect(surface, _COL_PANEL_BG, rect)
+
+        pad = 10
+        y = rect.y + 6
+        surface.blit(font.render("Sterowanie", True, _COL_HEADER),
+                     (rect.x + pad, y))
+        y += 22
+
+        for key, action in self.CONTROLS:
+            surface.blit(font.render(key, True, _COL_KEY), (rect.x + pad, y))
+            surface.blit(font.render(action, True, _COL_TEXT),
+                         (rect.x + pad + 42, y))
+            y += 20
+
+        y += 8
+        pygame.draw.line(surface, (40, 40, 55),
+                         (rect.x + pad, y), (rect.right - pad, y))
+        y += 10
+
+        surface.blit(font.render("Panel", True, _COL_HEADER), (rect.x + pad, y))
+        y += 22
+
+        for line in self.HINTS:
+            if line:
+                surface.blit(font.render(line, True, _COL_HINT),
+                             (rect.x + pad, y))
+            y += 17
+
+        pygame.draw.rect(surface, (40, 40, 55), rect, 1)
 
     def draw_hud(self, surface: pygame.Surface,
                  font: pygame.font.Font,

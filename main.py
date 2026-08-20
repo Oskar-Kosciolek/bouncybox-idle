@@ -20,6 +20,7 @@ from powerup import PowerUpSystem
 from ui.settings_view import SettingsView
 from ui.floating_text import FloatingTextSystem
 
+from confirm import ConfirmedAction
 from constants import PANEL_W, FPS, BG_COLOR
 from save_manager import save_game, load_game, delete_save
 from timestep import FixedTimestep
@@ -134,7 +135,10 @@ def main() -> None:
             f"zarobiles {short_number(offline_coins)} monet",
             color=(150, 220, 255), lifetime=8.0)
     powerup_system = PowerUpSystem()
-    settings_view = SettingsView()
+    # Jedno okno potwierdzenia dzielone przez przycisk w Ustawieniach i F6 —
+    # dwa osobne dałyby dwa niezależne uzbrojenia.
+    reset_confirm = ConfirmedAction(window_seconds=3.0)
+    settings_view = SettingsView(reset_confirm)
     autosave_timer: float = 0.0
     AUTOSAVE_INTERVAL = 30.0
 
@@ -156,8 +160,33 @@ def main() -> None:
             newly_unlocked = check_achievements(state)
             _notify_achievements(newly_unlocked, notifications, audio)
 
+    def hard_reset() -> None:
+        """Kasuje zapis i cofa grę do stanu sprzed pierwszego uruchomienia.
+
+        Jedno miejsce, bo drogi są dwie (F6 i przycisk w Ustawieniach), a nic
+        nie jest tak łatwe do rozjechania, jak dwie kopie listy rzeczy
+        do wyzerowania.
+        """
+        nonlocal state, balls, particles, floating_texts, powerup_system
+        nonlocal crush_pause
+        delete_save()
+        state = GameState()
+        config.apply_upgrades(state)
+        field.clear(hp=state.get_ring_hp(), wave=state.wave)
+        balls = _make_balls(cx, cy, config, 1)
+        particles = ParticleSystem()
+        floating_texts = FloatingTextSystem()
+        tree_view.state = state
+        prestige_view.state = state
+        achievements_view.state = state
+        powerup_system = PowerUpSystem()
+        # Bez tego nakładka „ZDUSZONY” zostaje na ekranie po resecie
+        # i zamraża świeżą grę na resztę karencji.
+        crush_pause = 0.0
+        notifications.add("Reset! Nowa gra.", color=(220, 80, 80), lifetime=2.0)
+
     def after_purchase() -> None:
-        """Wspólne skutki zakupu ulepszenia — z Sklepu albo z Drzewka.
+        """Wspólne skutki zakupu ulepszenia w Drzewku.
 
         Zakup wykrywany jest teraz przez zwracaną wartość `handle_event`.
         Wcześniej main.py porównywał `str(state.__dict__)` przed i po każdym
@@ -268,20 +297,17 @@ def main() -> None:
                     else:
                         notifications.add("Blad zapisu!", color=(220, 80, 80), lifetime=4.0)
                 if event.key == pygame.K_F6:
-                    delete_save()
-                    state = GameState()
-                    config.apply_upgrades(state)
-                    field.clear(hp=state.get_ring_hp(), wave=state.wave)
-                    balls = _make_balls(cx, cy, config, 1)
-                    particles = ParticleSystem()
-                    floating_texts = FloatingTextSystem()
-                    tree_view.state = state
-                    prestige_view.state = state
-                    achievements_view.state = state
-                    powerup_system = PowerUpSystem()
-                    notifications.add("Reset! Nowa gra.", color=(220, 80, 80), lifetime=2.0)
+                    # F5 leży obok, więc jedno wciśnięcie tylko uzbraja.
+                    if reset_confirm.request(game_time):
+                        hard_reset()
+                    else:
+                        notifications.add("F6 jeszcze raz = kasuje postep",
+                                          color=(220, 80, 80), lifetime=3.0)
 
-            tab_bar.handle_event(event, current_game_w)
+            if tab_bar.handle_event(event, current_game_w) is not None:
+                # Zmiana zakładki gasi uzbrojony reset — inaczej gracz wraca
+                # do Ustawień i jednym kliknięciem kasuje grę.
+                reset_confirm.cancel()
 
             if tab_bar.active == 1:
                 if tree_view.handle_event(event, current_game_w, current_game_h):
@@ -294,7 +320,9 @@ def main() -> None:
                 achievements_view.handle_event(event, current_game_w, current_game_h)
 
             elif tab_bar.active == 4:
-                settings_view.handle_event(event, config, current_game_w, current_game_h)
+                settings_view.handle_event(event, config, hard_reset,
+                                           game_time, current_game_w,
+                                           current_game_h)
                 # Suwaki sterują wejściami pól pochodnych — przeliczamy od
                 # razu, żeby zmiana była widoczna bez czekania na zakup
                 # albo awans fali.
@@ -461,15 +489,17 @@ def main() -> None:
         tab_bar.draw(screen, font, current_game_w, current_game_h)
 
         # Aktywny widok w panelu (pod zakładkami)
-        if tab_bar.active == 1:
+        if tab_bar.active == 0:
+            game_view.draw_controls(screen, font, current_game_w, current_game_h)
+        elif tab_bar.active == 1:
             tree_view.draw(screen, font, current_game_w, current_game_h)
         elif tab_bar.active == 2:
             prestige_view.draw(screen, font, current_game_w, current_game_h)
         elif tab_bar.active == 3:
             achievements_view.draw(screen, font, current_game_w, current_game_h)
         elif tab_bar.active == 4:
-            settings_view.draw(screen, font, config, current_game_w, current_game_h)
-        # Zakładka 0 (Gra) — tylko HUD, nic dodatkowego w panelu
+            settings_view.draw(screen, font, config, game_time,
+                               current_game_w, current_game_h)
 
         # Nakładka po zduszeniu — gra wraca sama, bez udziału gracza
         if crush_pause > 0.0:

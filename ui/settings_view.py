@@ -1,6 +1,7 @@
 import pygame
-from typing import TYPE_CHECKING
+from typing import Callable, TYPE_CHECKING
 
+from confirm import ConfirmedAction
 from constants import PANEL_W
 from ui.tab_bar import TAB_TOTAL_HEIGHT
 
@@ -13,6 +14,9 @@ _COL_VALUE   = (220, 200,  80)
 _COL_BAR_BG  = (40,  40,  55)
 _COL_BAR_FG  = (80, 140, 220)
 _COL_BORDER  = (40,  40,  55)
+_COL_RESET       = (120,  45,  45)
+_COL_RESET_ARMED = (200,  60,  60)
+_COL_RESET_TEXT  = (240, 220, 220)
 
 # (etykieta, pole w Config, min, max, czy_float)
 # Uwaga: ring_shrink_speed i ring_spawn_interval są POCHODNE — apply_upgrades
@@ -42,30 +46,71 @@ _SLIDERS: list[tuple[str, str, float, float, bool]] = [
 _ROW_H = 54   # wysokość jednego wiersza suwaka
 _BAR_H = 10   # wysokość paska suwaka
 _PAD   = 10   # padding poziomy
+# Stopka z przyciskiem resetu — nie przewija się razem z suwakami, bo suwaków
+# jest 18 i przycisk byłby poza ekranem dokładnie wtedy, gdy gracz go szuka.
+_FOOTER_H = 46
+_BTN_H    = 30
 
 
 class SettingsView:
-    """Widok developerski — suwaki do tuningu Config."""
+    """Widok developerski — suwaki do tuningu Config i twardy reset."""
 
-    def __init__(self) -> None:
+    def __init__(self, reset_confirm: ConfirmedAction) -> None:
         self.rect: pygame.Rect | None = None
         self._dragging: int | None = None   # indeks aktualnie przeciąganego suwaka
         self.scroll: float = 0.0            # offset scrolla w pikselach
+        # Współdzielony z F6 — jedno okno potwierdzenia na obie drogi.
+        self.reset_confirm = reset_confirm
+
+    # ------------------------------------------------------------------
+    # Geometria
+    # ------------------------------------------------------------------
+
+    def _set_rect(self, current_game_w: int, current_game_h: int) -> None:
+        self.rect = pygame.Rect(current_game_w, TAB_TOTAL_HEIGHT,
+                                PANEL_W, current_game_h - TAB_TOTAL_HEIGHT)
+
+    def slider_area(self) -> pygame.Rect:
+        """Przewijalny obszar suwaków — panel bez stopki."""
+        return pygame.Rect(self.rect.x, self.rect.y,
+                           self.rect.width, self.rect.height - _FOOTER_H)
+
+    def reset_btn_rect(self) -> pygame.Rect:
+        """Przycisk twardego resetu w stopce."""
+        return pygame.Rect(self.rect.x + _PAD,
+                           self.rect.bottom - _FOOTER_H + 8,
+                           self.rect.width - _PAD * 2, _BTN_H)
+
+    def reset_btn_label(self, now: float) -> str:
+        return ("NA PEWNO? (klik znow)"
+                if self.reset_confirm.is_armed(now) else "RESET WSZYSTKIEGO")
 
     # ------------------------------------------------------------------
     # Zdarzenia
     # ------------------------------------------------------------------
 
     def handle_event(self, event: pygame.event.Event, config: "Config",
+                     on_reset: Callable[[], None], now: float,
                      current_game_w: int, current_game_h: int) -> None:
-        self.rect = pygame.Rect(current_game_w, TAB_TOTAL_HEIGHT,
-                                PANEL_W, current_game_h - TAB_TOTAL_HEIGHT)
+        self._set_rect(current_game_w, current_game_h)
         if event.type == pygame.MOUSEWHEEL:
             self.scroll -= event.y * 20
-            max_scroll = max(0.0, len(_SLIDERS) * _ROW_H - self.rect.height + 30)
+            max_scroll = max(
+                0.0, len(_SLIDERS) * _ROW_H - self.slider_area().height + 30)
             self.scroll = max(0.0, min(self.scroll, max_scroll))
 
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self.reset_btn_rect().collidepoint(event.pos):
+                if self.reset_confirm.request(now):
+                    on_reset()
+                return
+
+            # Suwaki przewijają się pod stopkę, więc trafianie w nie musi się
+            # kończyć nad przyciskiem — inaczej jeden klik i kasuje postęp,
+            # i po drodze przestawia balans.
+            if not self.slider_area().collidepoint(event.pos):
+                return
+
             for i in range(len(_SLIDERS)):
                 bar_rect = self._bar_rect(i)
                 if bar_rect.collidepoint(event.pos):
@@ -94,14 +139,15 @@ class SettingsView:
     # ------------------------------------------------------------------
 
     def draw(self, surface: pygame.Surface, font: pygame.font.Font,
-             config: "Config", current_game_w: int, current_game_h: int) -> None:
-        self.rect = pygame.Rect(current_game_w, TAB_TOTAL_HEIGHT,
-                                PANEL_W, current_game_h - TAB_TOTAL_HEIGHT)
+             config: "Config", now: float,
+             current_game_w: int, current_game_h: int) -> None:
+        self._set_rect(current_game_w, current_game_h)
         pygame.draw.rect(surface, _COL_BG, self.rect)
 
-        # Przytnij do obszaru panelu
+        # Przytnij do obszaru suwaków, nie całego panelu — wiersz przewinięty
+        # na sam dół wjeżdżałby inaczej pod przycisk resetu.
         old_clip = surface.get_clip()
-        surface.set_clip(self.rect)
+        surface.set_clip(self.slider_area())
 
         header = font.render("Ustawienia (dev)", True, (120, 120, 160))
         surface.blit(header, (self.rect.x + _PAD, self.rect.y + 6))
@@ -137,7 +183,25 @@ class SettingsView:
                              border_radius=4)
 
         surface.set_clip(old_clip)
+        self._draw_reset_button(surface, font, now)
         pygame.draw.rect(surface, _COL_BORDER, self.rect, 1)
+
+    def _draw_reset_button(self, surface: pygame.Surface,
+                           font: pygame.font.Font, now: float) -> None:
+        """Stopka: przycisk kasujący cały postęp, z potwierdzeniem."""
+        btn = self.reset_btn_rect()
+        armed = self.reset_confirm.is_armed(now)
+
+        pygame.draw.rect(surface, (18, 18, 24),
+                         pygame.Rect(self.rect.x, btn.y - 8,
+                                     self.rect.width, _FOOTER_H))
+        pygame.draw.line(surface, _COL_BORDER,
+                         (self.rect.x, btn.y - 8), (self.rect.right, btn.y - 8))
+        pygame.draw.rect(surface,
+                         _COL_RESET_ARMED if armed else _COL_RESET,
+                         btn, border_radius=4)
+        label = font.render(self.reset_btn_label(now), True, _COL_RESET_TEXT)
+        surface.blit(label, label.get_rect(center=btn.center))
 
     # ------------------------------------------------------------------
     # Pomocnicze
