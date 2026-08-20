@@ -7,7 +7,6 @@ class TabBar:
 
     TABS: list[tuple[str, str]] = [
         ("[G]", "Gra"),
-        ("[S]", "Sklep"),
         ("[D]", "Drzewko"),
         ("[P]", "Prestige"),
         ("[A]", "Osiag."),

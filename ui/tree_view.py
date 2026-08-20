@@ -16,6 +16,12 @@ _COL_TEXT   = (200, 200, 220)
 _COL_DESC   = (120, 120, 140)
 _COL_LOCKED = (55, 55, 70)
 _COL_BORDER_BUY = (240, 210, 60)
+_COL_BUY_ON     = (50, 160, 80)
+_COL_BUY_OFF    = (55, 55, 70)
+_COL_DETAIL_BG  = (20, 20, 28)
+# Stan zablokowany w pasku: _COL_LOCKED to kolor wypełnienia węzła,
+# dobrany pod jaśniejsze tło panelu — na prawie czarnym pasku znika.
+_COL_REQ        = (170, 120, 120)
 
 _BRANCH_COLORS: dict[str, tuple[int, int, int]] = {
     "ball":    (220, 80,  80),
@@ -35,8 +41,10 @@ _NODE_R   = 14    # promień węzła
 # nazwa wchodziłaby pod następny węzeł.
 _NODE_GAP = 60    # odstęp między węzłami (Y)
 _HEADER_H = 36    # wysokość nagłówka gałęzi
-_DETAIL_H = 46    # pasek szczegółów u dołu — nie przewija się razem z węzłami
+_DETAIL_H = 76    # pasek szczegółów u dołu — nie przewija się razem z węzłami
 _SCROLL_STEP = 26
+_BTN_W    = 38    # przycisk Kup w pasku szczegółów
+_BTN_H    = 26
 
 
 class TreeView:
@@ -119,10 +127,19 @@ class TreeView:
             return False
 
         if event.type == pygame.MOUSEMOTION:
+            # Kursor w drodze do przycisku Kup opuszcza węzeł. Gdyby to
+            # czyściło wybór, pasek pustoszałby przed dojazdem do przycisku.
+            if self.detail_rect().collidepoint(event.pos):
+                return False
             self.hovered = self._node_at(event.pos)
             return False
 
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            btn = self.buy_btn_rect()
+            if btn is not None and btn.collidepoint(event.pos):
+                col, row = self.hovered
+                return self.branch_upgrades(col)[row].purchase(self.state)
+
             found = self._node_at(event.pos)
             if found is None:
                 return False
@@ -236,41 +253,104 @@ class TreeView:
         name_surf = font.render(name, True, name_col)
         surface.blit(name_surf, name_surf.get_rect(centerx=cx, top=name_y))
 
-    def _draw_detail(self, surface: pygame.Surface,
-                     font: pygame.font.Font) -> None:
-        """Pasek u dołu: szczegóły węzła pod kursorem.
+    def detail_rect(self) -> pygame.Rect:
+        """Pasek szczegółów u dołu panelu."""
+        return pygame.Rect(self.rect.x, self.rect.bottom - _DETAIL_H,
+                           self.rect.width, _DETAIL_H)
 
-        Węzeł ma 28 px średnicy w kolumnie szerokiej na 60 — nie zmieści się
-        w nim cena. Bez niej klikanie byłoby kupowaniem w ciemno.
+    def buy_btn_rect(self) -> pygame.Rect | None:
+        """Prostokąt przycisku Kup albo None, gdy nie ma czego kupić.
+
+        None zamiast ukrytego prostokąta: brak przycisku i przycisk poza
+        ekranem różnią się dla klikania, a nie różnią dla rysowania.
         """
-        strip = pygame.Rect(self.rect.x, self.rect.bottom - _DETAIL_H,
-                            self.rect.width, _DETAIL_H)
-        pygame.draw.rect(surface, (20, 20, 28), strip)
-        pygame.draw.line(surface, (40, 40, 55),
-                         strip.topleft, strip.topright)
-
         if self.hovered is None:
-            hint = font.render("Najedz na wezel", True, (90, 90, 110))
-            surface.blit(hint, hint.get_rect(center=strip.center))
-            return
+            return None
+        col, row = self.hovered
+        upg = self.branch_upgrades(col)[row]
+        if upg.is_maxed(self.state) or not upg.is_unlocked(self.state):
+            return None
+        strip = self.detail_rect()
+        return pygame.Rect(strip.right - _BTN_W - 6,
+                           strip.bottom - _BTN_H - 6, _BTN_W, _BTN_H)
+
+    def _find_upgrade_name(self, upg_id: str | None) -> str:
+        """Zwraca nazwę ulepszenia po jego id."""
+        if upg_id is None:
+            return ""
+        for u in self.upgrades:
+            if u.id == upg_id:
+                return u.name
+        return upg_id
+
+    def detail_lines(self) -> list[str]:
+        """Trzy wiersze opisujące węzeł pod kursorem: nazwa, opis, stan.
+
+        Treść liczona osobno od rysowania, bo jedyną asercją o narysowanym
+        pasku byłoby „piksele się zmieniły" — a to przechodzi także wtedy,
+        gdy pasek opisuje nie to ulepszenie.
+        """
+        if self.hovered is None:
+            return []
 
         col, row = self.hovered
         upg = self.branch_upgrades(col)[row]
         lvl = upg.current_level(self.state)
 
-        level_str = f"Lv.{lvl}" if upg.max_level is None \
-            else f"Lv.{lvl}/{upg.max_level}"
-        surface.blit(font.render(f"{upg.name}  {level_str}", True, _COL_TEXT),
-                     (strip.x + 6, strip.y + 4))
+        level_str = f"Lv.{lvl}" if upg.max_level is None             else f"Lv.{lvl}/{upg.max_level}"
 
         if upg.is_maxed(self.state):
-            status, color = "MAX", (120, 200, 120)
+            status = "MAX"
         elif not upg.is_unlocked(self.state):
-            status, color = "Zablokowane", _COL_LOCKED
+            status = f"Wymaga: {self._find_upgrade_name(upg.requires)}"
         else:
-            cost = upg.cost_at_level(lvl)
-            affordable = upg.can_afford(self.state)
-            status = f"Koszt: {short_number(cost)}"
-            color = _COL_BORDER_BUY if affordable else _COL_DESC
-        surface.blit(font.render(status, True, color),
-                     (strip.x + 6, strip.y + 20))
+            status = f"Koszt: {short_number(upg.cost_at_level(lvl))}"
+
+        return [f"{upg.name}  {level_str}", upg.description, status]
+
+    def _status_color(self) -> tuple[int, int, int]:
+        """Kolor trzeciego wiersza — ten sam podział co w detail_lines()."""
+        col, row = self.hovered
+        upg = self.branch_upgrades(col)[row]
+        if upg.is_maxed(self.state):
+            return (120, 200, 120)
+        if not upg.is_unlocked(self.state):
+            return _COL_REQ
+        return _COL_BORDER_BUY if upg.can_afford(self.state) else _COL_DESC
+
+    def _draw_detail(self, surface: pygame.Surface,
+                     font: pygame.font.Font) -> None:
+        """Pasek u dołu: szczegóły węzła pod kursorem.
+
+        Węzeł ma 28 px średnicy w kolumnie szerokiej na 60 — nie zmieści się
+        w nim ani cena, ani opis. Bez nich klikanie byłoby kupowaniem
+        w ciemno.
+        """
+        strip = self.detail_rect()
+        pygame.draw.rect(surface, _COL_DETAIL_BG, strip)
+        pygame.draw.line(surface, (40, 40, 55),
+                         strip.topleft, strip.topright)
+
+        lines = self.detail_lines()
+        if not lines:
+            hint = font.render("Najedz na wezel", True, (90, 90, 110))
+            surface.blit(hint, hint.get_rect(center=strip.center))
+            return
+
+        name_line, desc_line, status = lines
+        surface.blit(font.render(name_line, True, _COL_TEXT),
+                     (strip.x + 6, strip.y + 4))
+        surface.blit(font.render(desc_line, True, _COL_DESC),
+                     (strip.x + 6, strip.y + 22))
+        surface.blit(font.render(status, True, self._status_color()),
+                     (strip.x + 6, strip.y + 46))
+
+        btn = self.buy_btn_rect()
+        if btn is not None:
+            col, row = self.hovered
+            affordable = self.branch_upgrades(col)[row].can_afford(self.state)
+            pygame.draw.rect(surface,
+                             _COL_BUY_ON if affordable else _COL_BUY_OFF,
+                             btn, border_radius=4)
+            label = font.render("Kup", True, (230, 230, 240))
+            surface.blit(label, label.get_rect(center=btn.center))

@@ -11,7 +11,6 @@ from game_state import GameState
 from upgrade_tree import UPGRADES, PRESTIGE_UPGRADES
 from achievements import ACHIEVEMENTS, check_achievements
 from ui.tab_bar import TabBar
-from ui.shop_view import ShopView
 from ui.tree_view import TreeView
 from ui.game_view import GameView
 from ui.prestige_view import PrestigeView
@@ -124,7 +123,6 @@ def main() -> None:
     crush_pause: float = 0.0
 
     tab_bar = TabBar(PANEL_W)
-    shop_view = ShopView(state, UPGRADES)
     tree_view = TreeView(state, UPGRADES)
     game_view = GameView()
     prestige_view = PrestigeView(state, PRESTIGE_UPGRADES)
@@ -277,7 +275,6 @@ def main() -> None:
                     balls = _make_balls(cx, cy, config, 1)
                     particles = ParticleSystem()
                     floating_texts = FloatingTextSystem()
-                    shop_view.state = state
                     tree_view.state = state
                     prestige_view.state = state
                     achievements_view.state = state
@@ -287,20 +284,16 @@ def main() -> None:
             tab_bar.handle_event(event, current_game_w)
 
             if tab_bar.active == 1:
-                if shop_view.handle_event(event, current_game_w, current_game_h):
-                    after_purchase()
-
-            elif tab_bar.active == 2:
                 if tree_view.handle_event(event, current_game_w, current_game_h):
                     after_purchase()
 
-            elif tab_bar.active == 3:
+            elif tab_bar.active == 2:
                 prestige_view.handle_event(event, do_prestige, current_game_w, current_game_h)
 
-            elif tab_bar.active == 4:
+            elif tab_bar.active == 3:
                 achievements_view.handle_event(event, current_game_w, current_game_h)
 
-            elif tab_bar.active == 5:
+            elif tab_bar.active == 4:
                 settings_view.handle_event(event, config, current_game_w, current_game_h)
                 # Suwaki sterują wejściami pól pochodnych — przeliczamy od
                 # razu, żeby zmiana była widoczna bez czekania na zakup
@@ -469,14 +462,12 @@ def main() -> None:
 
         # Aktywny widok w panelu (pod zakładkami)
         if tab_bar.active == 1:
-            shop_view.draw(screen, font, current_game_w, current_game_h)
-        elif tab_bar.active == 2:
             tree_view.draw(screen, font, current_game_w, current_game_h)
-        elif tab_bar.active == 3:
+        elif tab_bar.active == 2:
             prestige_view.draw(screen, font, current_game_w, current_game_h)
-        elif tab_bar.active == 4:
+        elif tab_bar.active == 3:
             achievements_view.draw(screen, font, current_game_w, current_game_h)
-        elif tab_bar.active == 5:
+        elif tab_bar.active == 4:
             settings_view.draw(screen, font, config, current_game_w, current_game_h)
         # Zakładka 0 (Gra) — tylko HUD, nic dodatkowego w panelu
 
