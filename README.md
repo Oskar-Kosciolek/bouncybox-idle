@@ -53,7 +53,7 @@ jednej trzeciej zarobku w trakcie grania (dwukrotnie więcej z auto-kolektorem).
 ## Sterowanie
 
 Panel po prawej ma pięć zakładek: **Gra**, **Drzewko**, **Prestige**,
-**Osiągnięcia**, **Ustawienia**. Zakładka Gra powtarza tę ściągę na ekranie.
+**Osiągnięcia**, **Ustawienia**.
 Ulepszenia kupuje się w Drzewku — klikając węzeł albo przycisk **Kup** w pasku
 szczegółów, który po najechaniu pokazuje opis, poziom i cenę.
 
@@ -64,9 +64,13 @@ szczegółów, który po najechaniu pokazuje opis, poziom i cenę.
 | `F5` | ręczny zapis |
 | `F6` | twardy reset — kasuje zapis i zaczyna od zera |
 
-`F6` wymaga dwóch wciśnięć w ciągu trzech sekund; pierwsze tylko uzbraja.
-To samo potwierdzenie ma przycisk **RESET WSZYSTKIEGO** na dole zakładki
-Ustawienia — obie drogi dzielą jedno okno czasowe.
+Zakładka **Gra** powtarza tę ściągę i daje oba te działania myszą:
+**ZAPISZ TERAZ** u góry panelu, **RESET WSZYSTKIEGO** na samym dole, rozdzielone
+opisem gry — sąsiadujące przyciski o tak różnych skutkach proszą się o pomyłkę.
+
+Reset wymaga dwóch wciśnięć `F6` albo dwóch kliknięć w ciągu trzech sekund;
+pierwsze tylko uzbraja, a obie drogi dzielą jedno okno czasowe. Zmiana zakładki
+je gasi.
 
 Gra zapisuje się sama co 30 sekund do `save.json` obok plików gry.
 

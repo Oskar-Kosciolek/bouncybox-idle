@@ -125,7 +125,6 @@ def main() -> None:
 
     tab_bar = TabBar(PANEL_W)
     tree_view = TreeView(state, UPGRADES)
-    game_view = GameView()
     prestige_view = PrestigeView(state, PRESTIGE_UPGRADES)
     achievements_view = AchievementsView(state, ACHIEVEMENTS)
     notifications = NotificationSystem()
@@ -138,7 +137,8 @@ def main() -> None:
     # Jedno okno potwierdzenia dzielone przez przycisk w Ustawieniach i F6 —
     # dwa osobne dałyby dwa niezależne uzbrojenia.
     reset_confirm = ConfirmedAction(window_seconds=3.0)
-    settings_view = SettingsView(reset_confirm)
+    game_view = GameView(reset_confirm)
+    settings_view = SettingsView()
     autosave_timer: float = 0.0
     AUTOSAVE_INTERVAL = 30.0
 
@@ -159,6 +159,13 @@ def main() -> None:
             # Sprawdź osiągnięcia prestige
             newly_unlocked = check_achievements(state)
             _notify_achievements(newly_unlocked, notifications, audio)
+
+    def manual_save() -> None:
+        """Ręczny zapis — z F5 albo z przycisku w panelu Gry."""
+        if save_game(state):
+            notifications.add("Zapisano!", color=(100, 200, 100), lifetime=1.5)
+        else:
+            notifications.add("Blad zapisu!", color=(220, 80, 80), lifetime=4.0)
 
     def hard_reset() -> None:
         """Kasuje zapis i cofa grę do stanu sprzed pierwszego uruchomienia.
@@ -292,10 +299,7 @@ def main() -> None:
                     floating_texts = FloatingTextSystem()
                     powerup_system = PowerUpSystem()
                 if event.key == pygame.K_F5:
-                    if save_game(state):
-                        notifications.add("Zapisano!", color=(100, 200, 100), lifetime=1.5)
-                    else:
-                        notifications.add("Blad zapisu!", color=(220, 80, 80), lifetime=4.0)
+                    manual_save()
                 if event.key == pygame.K_F6:
                     # F5 leży obok, więc jedno wciśnięcie tylko uzbraja.
                     if reset_confirm.request(game_time):
@@ -309,7 +313,12 @@ def main() -> None:
                 # do Ustawień i jednym kliknięciem kasuje grę.
                 reset_confirm.cancel()
 
-            if tab_bar.active == 1:
+            if tab_bar.active == 0:
+                game_view.handle_event(event, manual_save, hard_reset,
+                                       game_time, current_game_w,
+                                       current_game_h)
+
+            elif tab_bar.active == 1:
                 if tree_view.handle_event(event, current_game_w, current_game_h):
                     after_purchase()
 
@@ -320,8 +329,7 @@ def main() -> None:
                 achievements_view.handle_event(event, current_game_w, current_game_h)
 
             elif tab_bar.active == 4:
-                settings_view.handle_event(event, config, hard_reset,
-                                           game_time, current_game_w,
+                settings_view.handle_event(event, config, current_game_w,
                                            current_game_h)
                 # Suwaki sterują wejściami pól pochodnych — przeliczamy od
                 # razu, żeby zmiana była widoczna bez czekania na zakup
@@ -490,7 +498,8 @@ def main() -> None:
 
         # Aktywny widok w panelu (pod zakładkami)
         if tab_bar.active == 0:
-            game_view.draw_controls(screen, font, current_game_w, current_game_h)
+            game_view.draw_controls(screen, font, game_time,
+                                    current_game_w, current_game_h)
         elif tab_bar.active == 1:
             tree_view.draw(screen, font, current_game_w, current_game_h)
         elif tab_bar.active == 2:
@@ -498,8 +507,8 @@ def main() -> None:
         elif tab_bar.active == 3:
             achievements_view.draw(screen, font, current_game_w, current_game_h)
         elif tab_bar.active == 4:
-            settings_view.draw(screen, font, config, game_time,
-                               current_game_w, current_game_h)
+            settings_view.draw(screen, font, config, current_game_w,
+                               current_game_h)
 
         # Nakładka po zduszeniu — gra wraca sama, bez udziału gracza
         if crush_pause > 0.0:

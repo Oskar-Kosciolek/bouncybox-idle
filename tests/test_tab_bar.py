@@ -4,14 +4,35 @@ from pathlib import Path
 from ui.tab_bar import TabBar
 
 
-def test_main_dispatches_every_tab_that_the_bar_shows():
-    """main.py wybiera widok łańcuchem `tab_bar.active == N`. Dołożenie albo
-    usunięcie zakładki przesuwa indeksy i po cichu podmienia widoki — klik
-    w Prestiż otwierałby Osiagniecia, bez błędu i bez śladu w testach.
+def _dispatch_chains() -> list[set[int]]:
+    """Łańcuchy `if/elif tab_bar.active == N` z main.py, każdy osobno.
+
+    Rozdzielone po słowie kluczowym, nie po wcięciu: `if` otwiera nowy
+    łańcuch, `elif` przedłuża bieżący. main.py ma ich dwa — jeden wybiera
+    obsługę zdarzeń, drugi rysowanie — i każdy może się zestarzeć osobno.
     """
     src = (Path(__file__).resolve().parent.parent / "main.py"
            ).read_text(encoding="utf-8")
 
-    handled = {int(n) for n in re.findall(r"tab_bar\.active == (\d+)", src)}
+    chains: list[set[int]] = []
+    for keyword, index in re.findall(
+            r"\b(if|elif) tab_bar\.active == (\d+):", src):
+        if keyword == "if":
+            chains.append(set())
+        chains[-1].add(int(index))
+    return chains
 
-    assert handled == set(range(len(TabBar.TABS)))
+
+def test_main_has_both_a_draw_chain_and_an_event_chain():
+    """Suma obu łańcuchów potrafiła być kompletna, gdy jeden z nich gubił
+    zakładkę — dlatego sprawdzamy je osobno, a najpierw że oba istnieją."""
+    assert len(_dispatch_chains()) == 2
+
+
+def test_every_dispatch_chain_covers_every_tab():
+    """Dołożenie albo usunięcie zakładki przesuwa indeksy i po cichu
+    podmienia widoki — klik w Prestiż otwierałby Osiagniecia, bez błędu."""
+    expected = set(range(len(TabBar.TABS)))
+
+    for i, chain in enumerate(_dispatch_chains()):
+        assert chain == expected, f"lancuch {i}: brakuje {expected - chain}"
