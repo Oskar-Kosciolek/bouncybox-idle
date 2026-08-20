@@ -199,6 +199,16 @@ class GameState:
             self.last_played_at = now
         return elapsed, coins
 
+    def ball_count(self) -> int:
+        """Ile piłek ma być na planszy.
+
+        Jedna formuła dla startu gry, nowej rundy, zduszenia, prestiżu
+        i zakupu — pięć niezależnych kopii właśnie dlatego się rozjechało:
+        start gubił oba ulepszenia, a nowa runda i zduszenie kasowały piłki
+        z prestiżu, za które gracz zapłacił kryształami.
+        """
+        return 1 + self.upgrade_multi_ball + self.prestige_extra_ball
+
     def get_ring_hp(self) -> int:
         """HP okręgu na bieżącej fali."""
         return max(1, int(RING_HP_BASE * WAVE_GROWTH ** (self.wave - 1)))

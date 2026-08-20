@@ -260,3 +260,39 @@ def test_the_upgrade_description_states_what_a_bounce_actually_pays():
     state.on_bounce()
 
     assert f"+{int(state.coins)} monet" in upg.description
+
+
+# ----------------------------------------------------------------------
+# Liczba piłek
+# ----------------------------------------------------------------------
+
+def test_a_fresh_game_has_one_ball():
+    assert GameState().ball_count() == 1
+
+
+def test_multi_ball_adds_one_ball_per_level():
+    assert GameState(upgrade_multi_ball=3).ball_count() == 4
+
+
+def test_the_prestige_upgrade_adds_balls_on_top():
+    assert GameState(prestige_extra_ball=2).ball_count() == 3
+
+
+def test_both_ball_upgrades_stack():
+    state = GameState(upgrade_multi_ball=2, prestige_extra_ball=1)
+
+    assert state.ball_count() == 4
+
+
+def test_main_never_recomputes_the_ball_count_itself():
+    """Wzór żył w sześciu miejscach i w czterech był inny: start gry gubił
+    oba ulepszenia, a nowa runda i zduszenie gubiły prestiżowe piłki.
+    Jedyna dozwolona kopia to GameState.ball_count().
+    """
+    from pathlib import Path
+
+    src = (Path(__file__).resolve().parent.parent / "main.py"
+           ).read_text(encoding="utf-8")
+
+    assert "upgrade_multi_ball" not in src
+    assert "prestige_extra_ball" not in src

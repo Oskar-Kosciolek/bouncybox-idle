@@ -57,7 +57,7 @@ def _make_balls(cx: float, cy: float, config: Config, count: int) -> list[Ball]:
 def _sync_balls(balls: list[Ball], cx: float, cy: float,
                 config: Config, state: GameState) -> list[Ball]:
     """Zapewnia właściwą liczbę piłek na podstawie stanu upgradeów."""
-    target = state.upgrade_multi_ball + 1   # 0->1, 1->2, 2->3
+    target = state.ball_count()
     while len(balls) < target:
         balls.extend(_make_balls(cx, cy, config, 1))
     # Nie usuwamy nadmiarowych piłek — niech same wylecą
@@ -116,7 +116,7 @@ def main() -> None:
     particles = ParticleSystem()
     field = RingField(config, (current_game_w, current_game_h),
                       hp=state.get_ring_hp(), wave=state.wave)
-    balls: list[Ball] = _make_balls(cx, cy, config, 1)
+    balls: list[Ball] = _make_balls(cx, cy, config, state.ball_count())
     floating_texts = FloatingTextSystem()
     # Krótka przerwa po zduszeniu — gracz ma zobaczyć, co się stało,
     # zanim gra ruszy dalej sama.
@@ -148,10 +148,7 @@ def main() -> None:
         if state.prestige():
             config.apply_upgrades(state)
             field.clear(hp=state.get_ring_hp(), wave=state.wave)
-            # Piłka startowa + dodatkowe z ulepszenia prestige_extra_ball
-            balls = [Ball(cx, cy, config)]
-            for i in range(state.prestige_extra_ball):
-                balls.append(Ball(cx + 20 * (i + 1), cy, config))
+            balls = _make_balls(cx, cy, config, state.ball_count())
             particles = ParticleSystem()
             floating_texts = FloatingTextSystem()
             notifications.add("PRESTIGE! Nowa runda rozpoczeta.",
@@ -180,7 +177,7 @@ def main() -> None:
         state = GameState()
         config.apply_upgrades(state)
         field.clear(hp=state.get_ring_hp(), wave=state.wave)
-        balls = _make_balls(cx, cy, config, 1)
+        balls = _make_balls(cx, cy, config, state.ball_count())
         particles = ParticleSystem()
         floating_texts = FloatingTextSystem()
         tree_view.state = state
@@ -293,8 +290,7 @@ def main() -> None:
                     # Nowa runda — zachowuje monety, ulepszenia i falę
                     config.apply_upgrades(state)
                     field.clear(hp=state.get_ring_hp(), wave=state.wave)
-                    balls = _make_balls(cx, cy, config,
-                                       state.upgrade_multi_ball + 1)
+                    balls = _make_balls(cx, cy, config, state.ball_count())
                     particles = ParticleSystem()
                     floating_texts = FloatingTextSystem()
                     powerup_system = PowerUpSystem()
@@ -381,7 +377,7 @@ def main() -> None:
                 state.on_crushed()
                 config.apply_upgrades(state)
                 field.clear(hp=state.get_ring_hp(), wave=state.wave)
-                balls = _make_balls(cx, cy, config, state.upgrade_multi_ball + 1)
+                balls = _make_balls(cx, cy, config, state.ball_count())
                 floating_texts = FloatingTextSystem()
                 crush_pause = CRUSH_PAUSE
                 audio.crush()
