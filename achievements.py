@@ -33,8 +33,13 @@ class Achievement:
             total = sum(getattr(state, f"upgrade_{u.id}") for u in UPGRADES)
             return total >= 5
         elif self.id == "upgrades_all":
+            # Ulepszenie bez sufitu nigdy nie jest "na maksie" — dla niego
+            # "kupione" znaczy pierwszy poziom. Porównanie poziomu wprost
+            # z `max_level` wywalało grę na None, a samo `is_maxed` zamieniłoby
+            # osiągnięcie w nieosiągalne z definicji.
             return all(
-                getattr(state, f"upgrade_{u.id}") >= u.max_level
+                u.is_maxed(state) or
+                (u.max_level is None and u.current_level(state) > 0)
                 for u in UPGRADES
             )
         elif self.id == "first_prestige":

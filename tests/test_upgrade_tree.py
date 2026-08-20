@@ -1,5 +1,7 @@
+import pytest
+
 from game_state import GameState
-from upgrade_tree import UPGRADES, Upgrade
+from upgrade_tree import INCOME_AT_UNLOCK, UPGRADES, Upgrade
 
 UNBOUNDED = Upgrade("ball_damage", "Sila uderzenia", "test", "ball",
                     None, 200.0, cost_multiplier=1.6)
@@ -47,3 +49,36 @@ def test_every_upgrade_id_matches_a_game_state_field():
     missing = [u.id for u in UPGRADES if not hasattr(state, f"upgrade_{u.id}")]
 
     assert missing == []
+
+
+def test_base_cost_is_minutes_times_anchor():
+    """Koszt pierwszego poziomu to deklarowane minuty gry razy kotwica warstwy."""
+    upg = Upgrade("x", "X", "opis", "ball", 3, cost_minutes=2.0, unlock_wave=10)
+    assert upg.base_cost == 2.0 * INCOME_AT_UNLOCK[10]
+
+
+def test_base_cost_differs_per_tier_for_same_minutes():
+    """Te same minuty na wyzszej warstwie kosztuja wiecej monet."""
+    tier1 = Upgrade("a", "A", "opis", "ball", 3, cost_minutes=1.0, unlock_wave=1)
+    tier3 = Upgrade("b", "B", "opis", "ball", 3, cost_minutes=1.0, unlock_wave=25)
+    assert tier3.base_cost > tier1.base_cost * 100
+
+
+def test_cost_at_level_still_compounds():
+    upg = Upgrade("x", "X", "opis", "ball", 5, cost_minutes=1.0,
+                  unlock_wave=1, cost_multiplier=2.0)
+    assert upg.cost_at_level(0) == 150.0
+    assert upg.cost_at_level(3) == 150.0 * 8
+
+
+def test_every_upgrade_uses_a_known_tier():
+    """Bramka falowa musi miec kotwice — inaczej base_cost rzuci KeyError w grze."""
+    for upg in UPGRADES:
+        assert upg.unlock_wave in INCOME_AT_UNLOCK
+
+
+def test_unknown_unlock_wave_fails_at_validation():
+    from upgrade_tree import _validate_unlock_waves
+    bad = [Upgrade("x", "X", "opis", "ball", 3, cost_minutes=1.0, unlock_wave=15)]
+    with pytest.raises(ValueError, match="unlock_wave"):
+        _validate_unlock_waves(bad)
